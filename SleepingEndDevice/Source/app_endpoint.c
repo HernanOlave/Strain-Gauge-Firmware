@@ -745,7 +745,7 @@ void APP_vtaskMyEndPoint (void)
 			wakeup = FALSE;
 
 			// Start ADC Conversion
-			MCP3204_convert(0, 0);
+
 			// ADC_CONVERT
 			adcDone = TRUE;
 

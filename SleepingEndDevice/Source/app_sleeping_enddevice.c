@@ -322,9 +322,14 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
                                        0x00,
                                        ZPS_APS_GLOBAL_LINK_KEY);
 
-    DBG_vPrintf(TRACE_APP, "APP: adc init\n");
+    DBG_vPrintf(TRACE_APP, "APP: MCP3204_init...");
     MCP3204_init(0, 3.3);
+    DBG_vPrintf(TRACE_APP, "OK\n");
 
+    MCP3204_convert(0, 0);
+    MCP3204_convert(0, 1);
+    MCP3204_convert(0, 2);
+    MCP3204_convert(0, 3);
 
     /* Initialise other software modules
      * HERE

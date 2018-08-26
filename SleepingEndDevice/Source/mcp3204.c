@@ -32,6 +32,10 @@
 	#define TRACE_APP 	TRUE
 #endif
 
+#define NXP_JN516X_PERIPHERAL_CLOCK 16000000 /*That's the peripheral clock supported by the JN516x*/
+#define SPI_SPEED 1000000 /*Desired SPI speed = 1MHz*/
+#define SPI_CLOCK_DIVIDER (NXP_JN516X_PERIPHERAL_CLOCK/SPI_SPEED)
+
 /**
  * @brief MCP3204 is represented by this structure.
  */
@@ -66,13 +70,15 @@ int MCP3204_init(SPIMode spi_mode, float ref_voltage)
 		bPhase = 0;
 	}
 
-	vAHI_SpiConfigure(2,
+	DBG_vPrintf(TRACE_APP, "APP: vAHI_SpiConfigure...");
+	vAHI_SpiConfigure(1,
 			  	  	  E_AHI_SPIM_MSB_FIRST,
 			  	  	  bPolarity,
 			  	  	  bPhase,
-			  	  	  16,
+			  	  	  SPI_CLOCK_DIVIDER,
 			  	  	  E_AHI_SPIM_INT_DISABLE,
 			  	  	  E_AHI_SPIM_AUTOSLAVE_ENBL);
+	DBG_vPrintf(TRACE_APP, "OK\n");
 
 
 	ad.referenceVoltage=ref_voltage;
@@ -86,9 +92,7 @@ int MCP3204_init(SPIMode spi_mode, float ref_voltage)
  */
 int MCP3204_convert(inputChannelMode channelMode, inputChannel channel)
 {
-	int ret;
 	uint8_t tx[] = {0x00, 0x00, 0x00};
-	uint8_t bits = 8;
 
 	/* set the start bit */
 	tx[0] |= START_BIT;
@@ -123,8 +127,8 @@ int MCP3204_convert(inputChannelMode channelMode, inputChannel channel)
 	DBG_vPrintf(TRACE_APP, "tx[0]: %d\n", tx[0]);
 	DBG_vPrintf(TRACE_APP, "tx[1]: %d\n", tx[1]);
 
-	DBG_vPrintf(TRACE_APP, "APP: sending %x ... ", tx[1] << 8 | tx[0]);
-	vAHI_SpiStartTransfer(2*bits, tx[1] << 8 | tx[0]);
+	DBG_vPrintf(TRACE_APP, "APP: sending %x ... ", tx[0] << 8 | tx[1]);
+	vAHI_SpiStartTransfer(15, tx[0] << 8 | tx[1]);
 	DBG_vPrintf(TRACE_APP, "OK\n");
 
 	DBG_vPrintf(TRACE_APP, "APP: reading... ");
