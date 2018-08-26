@@ -1,0 +1,3 @@
+11:48:45 **** Incremental Build of configuration Default for project SleepingEndDevice ****
+make TRACE=1 JENNIC_CHIP=JN5168 JENNIC_CHIP_FAMILY=JN516x all 
+make: *** No rule to make target `all'.  Stop.

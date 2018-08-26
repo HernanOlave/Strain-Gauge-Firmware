@@ -1,0 +1,9 @@
+eclipse.preferences.version=1
+environment/project/com.beyondsemi.toolchain.gnu.ba.elf.base.908471266.1972708848/CWD/delimiter=;
+environment/project/com.beyondsemi.toolchain.gnu.ba.elf.base.908471266.1972708848/CWD/operation=replace
+environment/project/com.beyondsemi.toolchain.gnu.ba.elf.base.908471266.1972708848/CWD/value=${ProjDirPath}\\${ConfigName}\\Build
+environment/project/com.beyondsemi.toolchain.gnu.ba.elf.base.908471266.1972708848/PWD/delimiter=;
+environment/project/com.beyondsemi.toolchain.gnu.ba.elf.base.908471266.1972708848/PWD/operation=replace
+environment/project/com.beyondsemi.toolchain.gnu.ba.elf.base.908471266.1972708848/PWD/value=${ProjDirPath}\\${ConfigName}\\Build
+environment/project/com.beyondsemi.toolchain.gnu.ba.elf.base.908471266.1972708848/append=true
+environment/project/com.beyondsemi.toolchain.gnu.ba.elf.base.908471266.1972708848/appendContributed=true

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<section name="Workbench">
+	<item value="COM13" key="jmp.prog.port"/>
+	<item value="ERASE_PDM" key="jmp.prog.eeprom.mode"/>
+	<item value="1000000" key="jmp.prog.baud"/>
+	<list key="jmp.prog.eeprom.filelist">
+		<item value=""/>
+	</list>
+	<list key="jmp.prog.image.filelist">
+		<item value="${workspace_loc:/ZigbeePRO Application Template/AN1184_ZBP_SleepingEndDevice/Build/AN1184_ZBP_SleepingEndDevice_JN5168.bin}"/>
+		<item value="${workspace_loc:/App-Template/AN1174_154_EndD/Build/AN1174_154_EndD_JN5168.bin}"/>
+	</list>
+</section>

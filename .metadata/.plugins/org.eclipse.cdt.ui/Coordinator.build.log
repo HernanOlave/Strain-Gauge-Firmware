@@ -1,0 +1,6 @@
+11:48:33 **** Incremental Build of configuration Default for project Coordinator ****
+make all 
+make: *** No rule to make target `all'.  Stop.
+
+11:48:33 Build Finished (took 140ms)
+

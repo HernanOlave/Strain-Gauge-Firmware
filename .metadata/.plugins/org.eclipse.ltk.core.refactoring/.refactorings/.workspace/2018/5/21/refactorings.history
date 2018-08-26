@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Delete resource &apos;JN-AN-1174-JN516x-802-15-4-Application-Template&apos;" deleteContents="false" description="Delete resource &apos;JN-AN-1174-JN516x-802-15-4-Application-Template&apos;" element1="/JN-AN-1174-JN516x-802-15-4-Application-Template" flags="7" id="org.eclipse.ltk.core.refactoring.delete.resources" resources="1" stamp="1527170565257"/>
+</session>

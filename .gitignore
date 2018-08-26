@@ -1,0 +1,11 @@
+/JN517x/
+/Doc/
+/AN1229_ZBP_Router/
+*.o
+*.elf
+*.map
+*.d
+*/Source/pdum_gen.c
+*/Source/pdum_gen.h
+*/Source/zps_gen.c
+*/Source/zps_gen.h
