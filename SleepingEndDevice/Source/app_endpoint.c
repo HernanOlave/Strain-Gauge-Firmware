@@ -743,9 +743,18 @@ void APP_vtaskMyEndPoint (void)
 	    else if( wakeup )
 		{
 			wakeup = FALSE;
+			uint8_t i;
 
 			// Start ADC Conversion
+			DBG_vPrintf(TRACE_APP, "APP: MCP3204_init...");
+			MCP3204_init(0, 3.3);
+			DBG_vPrintf(TRACE_APP, "OK\n");
 
+			for (i = 0; i < 4; i++)
+			{
+				MCP3204_convert(0, i);
+				DBG_vPrintf(TRACE_APP, "APP: CH%d = %d - %f\n", i, MCP3204_getValue(), MCP3204_analogValue());
+			}
 			// ADC_CONVERT
 			adcDone = TRUE;
 

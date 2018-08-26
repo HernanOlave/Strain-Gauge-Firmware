@@ -36,6 +36,9 @@
 #define SPI_SPEED 1000000 /*Desired SPI speed = 1MHz*/
 #define SPI_CLOCK_DIVIDER (NXP_JN516X_PERIPHERAL_CLOCK/SPI_SPEED)
 
+#define LOWER_CS() do { vAHI_SpiWaitBusy(); vAHI_SpiSelect(1<<0); vAHI_SpiWaitBusy(); } while(0)
+#define RAISE_CS() do { vAHI_SpiWaitBusy(); vAHI_SpiSelect(0); vAHI_SpiWaitBusy(); } while(0)
+
 /**
  * @brief MCP3204 is represented by this structure.
  */
@@ -53,11 +56,7 @@ MCP3204 ad;
  */
 int MCP3204_init(SPIMode spi_mode, float ref_voltage)
 {
-	tSpiConfiguration spiConfiguration;
-
 	uint8_t bPolarity, bPhase;
-	uint32_t speed = 100000;
-	int ret;
 
 	if (spi_mode)
 	{
@@ -70,16 +69,13 @@ int MCP3204_init(SPIMode spi_mode, float ref_voltage)
 		bPhase = 0;
 	}
 
-	DBG_vPrintf(TRACE_APP, "APP: vAHI_SpiConfigure...");
 	vAHI_SpiConfigure(1,
 			  	  	  E_AHI_SPIM_MSB_FIRST,
 			  	  	  bPolarity,
 			  	  	  bPhase,
 			  	  	  SPI_CLOCK_DIVIDER,
 			  	  	  E_AHI_SPIM_INT_DISABLE,
-			  	  	  E_AHI_SPIM_AUTOSLAVE_ENBL);
-	DBG_vPrintf(TRACE_APP, "OK\n");
-
+			  	  	  E_AHI_SPIM_AUTOSLAVE_DSABL);
 
 	ad.referenceVoltage=ref_voltage;
 
@@ -93,6 +89,7 @@ int MCP3204_init(SPIMode spi_mode, float ref_voltage)
 int MCP3204_convert(inputChannelMode channelMode, inputChannel channel)
 {
 	uint8_t tx[] = {0x00, 0x00, 0x00};
+	uint8_t i;
 
 	/* set the start bit */
 	tx[0] |= START_BIT;
@@ -124,18 +121,17 @@ int MCP3204_convert(inputChannelMode channelMode, inputChannel channel)
 			break;
 	}
 
-	DBG_vPrintf(TRACE_APP, "tx[0]: %d\n", tx[0]);
-	DBG_vPrintf(TRACE_APP, "tx[1]: %d\n", tx[1]);
+	LOWER_CS();
 
-	DBG_vPrintf(TRACE_APP, "APP: sending %x ... ", tx[0] << 8 | tx[1]);
-	vAHI_SpiStartTransfer(15, tx[0] << 8 | tx[1]);
-	DBG_vPrintf(TRACE_APP, "OK\n");
+	for(i = 0; i < 3; i++)
+	{
+		vAHI_SpiStartTransfer8(tx[i]);
+		vAHI_SpiWaitBusy();
+	}
 
-	DBG_vPrintf(TRACE_APP, "APP: reading... ");
 	ad.digitalValue = u16AHI_SpiReadTransfer16();
-	DBG_vPrintf(TRACE_APP, "OK\n");
 
-	DBG_vPrintf(TRACE_APP, "digitalValue: %d\n", ad.digitalValue);
+	RAISE_CS();
 
 	return 0;
 }
