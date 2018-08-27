@@ -89,6 +89,7 @@ int MCP3204_init(SPIMode spi_mode, float ref_voltage)
 int MCP3204_convert(inputChannelMode channelMode, inputChannel channel)
 {
 	uint8_t tx[] = {0x00, 0x00, 0x00};
+	uint32_t rx;
 	uint8_t i;
 
 	/* set the start bit */
@@ -123,13 +124,21 @@ int MCP3204_convert(inputChannelMode channelMode, inputChannel channel)
 
 	LOWER_CS();
 
-	for(i = 0; i < 3; i++)
-	{
-		vAHI_SpiStartTransfer8(tx[i]);
-		vAHI_SpiWaitBusy();
-	}
+	vAHI_SpiStartTransfer(15, tx[1] << 8 | tx[0]);
+	vAHI_SpiWaitBusy();
 
-	ad.digitalValue = u16AHI_SpiReadTransfer16();
+	//vAHI_SpiStartTransfer8(tx[0]);
+	//vAHI_SpiWaitBusy();
+	//vAHI_SpiStartTransfer8(tx[1]);
+	//vAHI_SpiWaitBusy();
+	//vAHI_SpiStartTransfer8(tx[2]);
+
+	rx = u32AHI_SpiReadTransfer32();
+	vAHI_SpiWaitBusy();
+
+	DBG_vPrintf(TRACE_APP, "SPI: %x\n", rx);
+
+	ad.digitalValue = rx & 0x0fff;
 
 	RAISE_CS();
 

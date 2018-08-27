@@ -753,7 +753,7 @@ void APP_vtaskMyEndPoint (void)
 			for (i = 0; i < 4; i++)
 			{
 				MCP3204_convert(0, i);
-				DBG_vPrintf(TRACE_APP, "APP: CH%d = %d - %f\n", i, MCP3204_getValue(), MCP3204_analogValue());
+				DBG_vPrintf(TRACE_APP, "APP: CH%d = %d - %x\n", i, MCP3204_getValue(), MCP3204_getValue());
 			}
 			// ADC_CONVERT
 			adcDone = TRUE;
