@@ -73,7 +73,7 @@
 #define APP_QUEUE_SIZE               2
 #define MCPS_DCFM_QUEUE_SIZE         8
 
-#define DIO0    0x01
+#define DIO13    					13
 
 /****************************************************************************/
 /***        Local Function Prototypes                                     ***/
@@ -172,10 +172,10 @@ PUBLIC void vAppMain(void)
 
 
     // initialize Config input
-    vAHI_DioSetDirection( DIO0, 0x0 );      // set DIO0 as input (default)
-    vAHI_DioSetPullup( DIO0, 0x0 );         // enable DIO0 pull-up (default)
-    vAHI_DioWakeEdge( 0, DIO0 );       // set DIO0 interrupt to falling edge
-    vAHI_DioWakeEnable( DIO0, 0 );     // enable DIO0 interrupt
+    vAHI_DioSetDirection((1 << DIO13), 0x0);	// set DIO0 as input (default)
+    vAHI_DioSetPullup((1 << DIO13), 0x0);		// enable DIO0 pull-up (default)
+    vAHI_DioWakeEdge( 0, (1 << DIO13));			// set DIO0 interrupt to falling edge
+    vAHI_DioWakeEnable((1 << DIO13), 0);		// enable DIO0 interrupt
 
 
     /* Define HIGH_POWER_ENABLE to enable high power module */
@@ -281,7 +281,7 @@ PWRM_CALLBACK(Wakeup)
     DBG_vUartInit(DBG_E_UART_0, DBG_E_UART_BAUD_RATE_115200);
 
     uint32 wakeStatus = u32AHI_DioWakeStatus();
-    if( wakeStatus & DIO0 )
+    if( wakeStatus & DIO13 )
     {
         configPressed_sed = TRUE;
         configPressed_ep  = TRUE;

@@ -44,6 +44,8 @@
 #include "pdum_gen.h"
 #include "pdm_app_ids.h"
 #include "mcp3204.h"
+#include "ad8231.h"
+#include "ltc1661.h"
 
 /****************************************************************************/
 /***        Macro Definitions                                             ***/
@@ -555,7 +557,6 @@ void APP_vtaskMyEndPoint (void)
         endPointState = EP_STATE_INIT;
     }
 
-
 	switch( endPointState )
 	{
 	case EP_STATE_INIT:
@@ -745,16 +746,27 @@ void APP_vtaskMyEndPoint (void)
 			wakeup = FALSE;
 			uint8_t i;
 
+			ad8231_init();
+			ad8231_enable();
+			ad8231_setGain(AD8231_GAIN_128);
+
+			ltc1661_init();
+			ltc1661_setDAC_A(0xffff);
+
 			// Start ADC Conversion
 			DBG_vPrintf(TRACE_APP, "APP: MCP3204_init...");
 			MCP3204_init(0, 3.3);
 			DBG_vPrintf(TRACE_APP, "OK\n");
 
-			for (i = 0; i < 4; i++)
+			for (i = 0; i < 3; i++)
 			{
 				MCP3204_convert(0, i);
 				DBG_vPrintf(TRACE_APP, "APP: CH%d = %d - %x\n", i, MCP3204_getValue(), MCP3204_getValue());
 			}
+
+			ad8231_disable();
+			ltc1661_sleep();
+
 			// ADC_CONVERT
 			adcDone = TRUE;
 

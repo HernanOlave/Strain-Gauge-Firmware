@@ -49,7 +49,6 @@
 #include <ZTimer.h>
 #include "pdum_gen.h"
 #include "pdm_app_ids.h"
-#include "mcp3204.h"
 
 /****************************************************************************/
 /***        Macro Definitions                                             ***/

@@ -69,7 +69,7 @@ int MCP3204_init(SPIMode spi_mode, float ref_voltage)
 		bPhase = 0;
 	}
 
-	vAHI_SpiConfigure(1,
+	vAHI_SpiConfigure(0,
 			  	  	  E_AHI_SPIM_MSB_FIRST,
 			  	  	  bPolarity,
 			  	  	  bPhase,
@@ -105,15 +105,12 @@ int MCP3204_convert(inputChannelMode channelMode, inputChannel channel)
 
 	LOWER_CS();
 
-	DBG_vPrintf(TRACE_APP, "SPI: %x\n", tx);
-
-	vAHI_SpiStartTransfer(4, tx);
+	vAHI_SpiStartTransfer(7, tx);
 	vAHI_SpiWaitBusy();
-	vAHI_SpiStartTransfer(4, 0);
+	vAHI_SpiStartTransfer(13, 0);
 	vAHI_SpiWaitBusy();
 
-	rx = u32AHI_SpiReadTransfer32();
-	vAHI_SpiWaitBusy();
+	rx = u16AHI_SpiReadTransfer16();
 
 	DBG_vPrintf(TRACE_APP, "SPI: %x\n", rx);
 
