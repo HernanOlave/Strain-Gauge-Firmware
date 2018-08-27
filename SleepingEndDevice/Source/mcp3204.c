@@ -88,50 +88,29 @@ int MCP3204_init(SPIMode spi_mode, float ref_voltage)
  */
 int MCP3204_convert(inputChannelMode channelMode, inputChannel channel)
 {
-	uint8_t tx[] = {0x00, 0x00, 0x00};
+	uint8_t tx;
 	uint32_t rx;
-	uint8_t i;
 
 	/* set the start bit */
-	tx[0] |= START_BIT;
+	tx = 0b10000;
 
 	/* define the channel input mode */
 	if (channelMode==singleEnded)
-		tx[0] |= SINGLE_ENDED;
+		tx |= 0b01000;
 	if (channelMode==differential)
-		tx[0] &= DIFFERENTIAL;
+		tx &= 0b10111;
 
-	/* set the input channel/pair */
-	switch(channel)
-	{
-		case CH0:
-		case CH01:
-			tx[1] |= CH_0;
-			break;
-		case CH1:
-		case CH10:
-			tx[1] |= CH_1;
-			break;
-		case CH2:
-		case CH23:
-			tx[1] |= CH_2;
-			break;
-		case CH3:
-		case CH32:
-			tx[1] |= CH_3;
-			break;
-	}
+	/* set the input channel */
+	tx |= (channel & 0b0111);
 
 	LOWER_CS();
 
-	vAHI_SpiStartTransfer(15, tx[1] << 8 | tx[0]);
-	vAHI_SpiWaitBusy();
+	DBG_vPrintf(TRACE_APP, "SPI: %x\n", tx);
 
-	//vAHI_SpiStartTransfer8(tx[0]);
-	//vAHI_SpiWaitBusy();
-	//vAHI_SpiStartTransfer8(tx[1]);
-	//vAHI_SpiWaitBusy();
-	//vAHI_SpiStartTransfer8(tx[2]);
+	vAHI_SpiStartTransfer(4, tx);
+	vAHI_SpiWaitBusy();
+	vAHI_SpiStartTransfer(4, 0);
+	vAHI_SpiWaitBusy();
 
 	rx = u32AHI_SpiReadTransfer32();
 	vAHI_SpiWaitBusy();
