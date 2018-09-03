@@ -112,8 +112,6 @@ int MCP3204_convert(inputChannelMode channelMode, inputChannel channel)
 
 	rx = u16AHI_SpiReadTransfer16();
 
-	DBG_vPrintf(TRACE_APP, "SPI: %x\n", rx);
-
 	ad.digitalValue = rx & 0x0fff;
 
 	RAISE_CS();

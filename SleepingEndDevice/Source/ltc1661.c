@@ -75,7 +75,6 @@ void ltc1661_setDAC_A(unsigned int value)
 	tx |= (LTC1661_CTRLCODE_UPDA_A << 12);
 	tx |= (value & 0x0fff);
 
-	DBG_vPrintf(TRACE_APP, "SPI: %x\n", tx);
 	LOWER_CS();
 
 	vAHI_SpiStartTransfer16(tx);
@@ -91,7 +90,6 @@ void ltc1661_setDAC_B(unsigned int value)
 	tx |= (LTC1661_CTRLCODE_UPDA_B << 12);
 	tx |= (value & 0x0fff);
 
-	DBG_vPrintf(TRACE_APP, "SPI: %x\n", tx);
 	LOWER_CS();
 
 	vAHI_SpiStartTransfer16(tx);

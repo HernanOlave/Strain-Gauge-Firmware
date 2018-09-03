@@ -34,6 +34,7 @@ void ad8231_init(void)
 	// initialize ad8231 pins as outputs
 	vAHI_DioSetDirection(0x0,
 						(1 << AD8231_PIN_CS) |
+						(1 << AD8231_PIN_SDN) |
 						(1 << AD8231_PIN_A0) |
 						(1 << AD8231_PIN_A1) |
 						(1 << AD8231_PIN_A2) );
@@ -41,12 +42,12 @@ void ad8231_init(void)
 
 void ad8231_enable(void)
 {
-	vAHI_DioSetOutput(0x0, (1 << AD8231_PIN_CS));
+	vAHI_DioSetOutput((1 << AD8231_PIN_SDN), (1 << AD8231_PIN_CS));
 }
 
 void ad8231_disable(void)
 {
-	vAHI_DioSetOutput((1 << AD8231_PIN_CS), 0x0);
+	vAHI_DioSetOutput((1 << AD8231_PIN_CS), (1 << AD8231_PIN_SDN));
 }
 
 void ad8231_setGain(unsigned char gain)

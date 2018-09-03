@@ -59,10 +59,15 @@
 #endif
 
 #define NO_NETWORK_SLEEP_DUR        10  // seconds
-#define CONFIG_STATE_SLEEP_DUR      4   // seconds
-#define SAMPLE_RATE_DEFAULT         1   // seconds
+#define CONFIG_STATE_SLEEP_DUR      10   // seconds
+#define SAMPLE_RATE_DEFAULT         10   // seconds
 
-#define SECS_TO_TICKS( seconds )		seconds * 32768
+#define DIO17						17
+#define ENABLE_3VLN() 				vAHI_DioSetDirection(0x0,(1 << DIO17)); vAHI_DioSetOutput((1 << DIO17), 0x0);
+#define DISABLE_3VLN() 				vAHI_DioSetDirection(0x0,(1 << DIO17)); vAHI_DioSetOutput(0x0, (1 << DIO17));
+
+#define SECS_TO_TICKS( seconds )	seconds * 32768
+
 
 /****************************************************************************/
 /***        Type Definitions                                              ***/
@@ -222,17 +227,45 @@ void SendData()
         }
         else
         {
-            // read ADC values
-            int16 sensorValue = 0x5678;
-            int16 batteryValue = 0x9ABC;
+        	int sensorValue, temperatureValue, batteryValue;
+
+        	ENABLE_3VLN();
+        	ad8231_init();
+        	ad8231_enable();
+        	ad8231_setGain(AD8231_GAIN_16);
+
+        	ltc1661_init();
+        	ltc1661_setDAC_A(2000);
+        	ltc1661_setDAC_B(2000);
+
+        	// Start ADC Conversion
+        	DBG_vPrintf(TRACE_APP, "APP: MCP3204_init...");
+        	MCP3204_init(0, 3.3);
+        	DBG_vPrintf(TRACE_APP, "OK\n");
+
+        	MCP3204_convert(0, 2);
+        	sensorValue = MCP3204_getValue();
+        	MCP3204_convert(0, 1);
+        	temperatureValue = MCP3204_getValue();
+        	MCP3204_convert(0, 0);
+        	batteryValue = MCP3204_getValue();
+
+        	DBG_vPrintf(TRACE_APP, "APP: sensorValue = %d - %x\n", sensorValue, sensorValue);
+        	DBG_vPrintf(TRACE_APP, "APP: temperatureValue = %d - %x\n", temperatureValue, temperatureValue);
+        	DBG_vPrintf(TRACE_APP, "APP: batteryValue = %d - %x\n", batteryValue, batteryValue);
+
+        	ad8231_disable();
+        	ltc1661_sleep();
+        	//DISABLE_3VLN();
 
             // load payload data into APDU
             uint16 byteCount = PDUM_u16APduInstanceWriteNBO(
                     data,	// APDU instance handle
                     0,		// APDU position for data
-                    "bhh",	// data format string
+                    "bhhh",	// data format string
                     '*',
                     sensorValue,
+                    temperatureValue,
                     batteryValue
             );
             if( byteCount == 0 )
@@ -735,8 +768,6 @@ void APP_vtaskMyEndPoint (void)
 		break;
 	case EP_STATE_RUNNING:
 	{
-	    static bool_t adcDone = TRUE;   // temporary until actual ADC code is added
-
 	    if( s_eDeviceState.eNodeState != E_RUNNING )
 		{
 			endPointState = EP_STATE_WAIT_NETWORK;
@@ -744,50 +775,12 @@ void APP_vtaskMyEndPoint (void)
 	    else if( wakeup )
 		{
 			wakeup = FALSE;
-			uint8_t i;
-
-			ad8231_init();
-			ad8231_enable();
-			ad8231_setGain(AD8231_GAIN_128);
-
-			ltc1661_init();
-			ltc1661_setDAC_A(0xffff);
-
-			// Start ADC Conversion
-			DBG_vPrintf(TRACE_APP, "APP: MCP3204_init...");
-			MCP3204_init(0, 3.3);
-			DBG_vPrintf(TRACE_APP, "OK\n");
-
-			for (i = 0; i < 3; i++)
-			{
-				MCP3204_convert(0, i);
-				DBG_vPrintf(TRACE_APP, "APP: CH%d = %d - %x\n", i, MCP3204_getValue(), MCP3204_getValue());
-			}
-
-			ad8231_disable();
-			ltc1661_sleep();
-
-			// ADC_CONVERT
-			adcDone = TRUE;
 
 			DBG_vPrintf(TRACE_APP, "APP_RUN: Sleep Time: %d seconds\n", samplePeriod );
 			PWRM_eScheduleActivity(&sWake, SECS_TO_TICKS(samplePeriod), vWakeCallBack);
-
-			vRunning();
+			SendData();
 		}
-	    else
-	    {
-	        if( adcDone )  // poll for "ADC done" ADC_POLL
-            {
-                adcDone = FALSE;
-                // Read ADC Values
-                // ADC_READ
-
-                SendData();
-            }
-
-	        vRunning();
-	    }
+	    else vRunning();
 
 	    break;
 	}

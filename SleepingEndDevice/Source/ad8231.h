@@ -38,11 +38,13 @@
 #define AD8231_GAIN_128		128
 
 #define DIO0				0
+#define DIO8				8
 #define DIO14				14
 #define DIO15				15
 #define DIO16				16
 
 #define AD8231_PIN_CS		DIO0
+#define AD8231_PIN_SDN		DIO8
 #define AD8231_PIN_A0		DIO14
 #define AD8231_PIN_A1		DIO15
 #define AD8231_PIN_A2		DIO16
