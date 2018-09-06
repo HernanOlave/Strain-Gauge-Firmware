@@ -381,7 +381,6 @@ void ProcessUART()
                         else
                         {
                             // TX data request successful
-
                         }
                     }
                 }
@@ -393,11 +392,68 @@ void ProcessUART()
         {
             // Permit Joining command
             // allow node joining for X seconds
-
             PermitJoining();
-
             break;
         }
+        case '&':
+		{
+			// Send broadcast command
+			PDUM_teStatus status;
+
+			// allocate memory for APDU buffer with preconfigured "type"
+			PDUM_thAPduInstance data = PDUM_hAPduAllocateAPduInstance(
+			apduMyData );
+			if( data == PDUM_INVALID_HANDLE )
+			{
+				// problem allocating APDU instance memory
+				DBG_vPrintf( TRACE_APP,
+						"APP: Unable to allocate APDU memory\n" );
+			}
+			else
+			{
+				// load payload data into APDU
+				uint16 byteCount = PDUM_u16APduInstanceWriteNBO( data, // APDU instance handle
+						0,		// APDU position for data
+						"b",	// data format string
+						'&');
+				if( byteCount == 0 )
+				{
+					// no data was written to the APDU instance
+					DBG_vPrintf( TRACE_APP, "APP: No data written to APDU\n" );
+				}
+				else
+				{
+					PDUM_eAPduInstanceSetPayloadSize( data, byteCount );
+
+					DBG_vPrintf( TRACE_APP,
+							"APP: Data written to APDU: %d\n", byteCount );
+
+					// request data send to destination
+					status = ZPS_eAplAfBroadcastDataReq(
+							data,	                // APDU instance handle
+							0xffff,					// cluster ID
+							1,						// source endpoint
+							1,						// destination endpoint
+							ZPS_E_BROADCAST_ALL,   	// destination network address
+							ZPS_E_APL_AF_UNSECURE,	// security mode
+							0,						// radius
+							NULL				    // sequence number pointer
+							);
+					if( status != ZPS_E_SUCCESS )
+					{
+						// problem with request
+						DBG_vPrintf( TRACE_APP,
+								"APP: AckDataReq not successful. Return: 0x%x\n",
+								status );
+					}
+					else
+					{
+						// TX data request successful
+					}
+				}
+			}
+			break;
+		}
         default:
             DBG_vPrintf( TRACE_APP, "UART Unrecognized Command" );
         }
@@ -491,134 +547,217 @@ void APP_vtaskMyEndPoint( void )
     {
         switch( sStackEvent.eType )
         {
-        case ZPS_EVENT_APS_DATA_INDICATION:
-        {
-            DBG_vPrintf( TRACE_APP, "APP: APP_taskEndPoint: ZPS_EVENT_AF_DATA_INDICATION\n" );
+			case ZPS_EVENT_APS_DATA_INDICATION:
+			{
+				DBG_vPrintf( TRACE_APP, "APP: APP_taskEndPoint: ZPS_EVENT_AF_DATA_INDICATION\n" );
 
-            /* Process incoming cluster messages for this endpoint... */
-            DBG_vPrintf( TRACE_APP, "    Data Indication:\n" );
-            DBG_vPrintf( TRACE_APP, "        Status  : %x\n",
-                    sStackEvent.uEvent.sApsDataIndEvent.eStatus );
-            DBG_vPrintf( TRACE_APP, "        Profile : %x\n",
-                    sStackEvent.uEvent.sApsDataIndEvent.u16ProfileId );
-            DBG_vPrintf( TRACE_APP, "        Cluster : %x\n",
-                    sStackEvent.uEvent.sApsDataIndEvent.u16ClusterId );
-            DBG_vPrintf( TRACE_APP, "        EndPoint: %x\n",
-                    sStackEvent.uEvent.sApsDataIndEvent.u8DstEndpoint );
+				/* Process incoming cluster messages for this endpoint... */
+				DBG_vPrintf( TRACE_APP, "    Data Indication:\n" );
+				DBG_vPrintf( TRACE_APP, "        Status  : %x\n",
+						sStackEvent.uEvent.sApsDataIndEvent.eStatus );
+				DBG_vPrintf( TRACE_APP, "        Profile : %x\n",
+						sStackEvent.uEvent.sApsDataIndEvent.u16ProfileId );
+				DBG_vPrintf( TRACE_APP, "        Cluster : %x\n",
+						sStackEvent.uEvent.sApsDataIndEvent.u16ClusterId );
+				DBG_vPrintf( TRACE_APP, "        EndPoint: %x\n",
+						sStackEvent.uEvent.sApsDataIndEvent.u8DstEndpoint );
 
-            uint8 lqi = sStackEvent.uEvent.sApsDataIndEvent.u8LinkQuality;
-            DBG_vPrintf( TRACE_APP, "        LQI     : %d\n", lqi );
+				uint8 lqi = sStackEvent.uEvent.sApsDataIndEvent.u8LinkQuality;
+				DBG_vPrintf( TRACE_APP, "        LQI     : %d\n", lqi );
 
-            uint64 macAddress = ZPS_u64AplZdoLookupIeeeAddr(
-                    sStackEvent.uEvent.sApsDataIndEvent.uSrcAddress.u16Addr );
-            DBG_vPrintf( TRACE_APP, "        MAC Address: %08x%08x (%04x)\n",
-                    (uint32 )(macAddress >> 32), (uint32 )macAddress,
-                    sStackEvent.uEvent.sApsDataIndEvent.uSrcAddress.u16Addr );
+				uint64 macAddress = ZPS_u64AplZdoLookupIeeeAddr(
+						sStackEvent.uEvent.sApsDataIndEvent.uSrcAddress.u16Addr );
+				DBG_vPrintf( TRACE_APP, "        MAC Address: %08x%08x (%04x)\n",
+						(uint32 )(macAddress >> 32), (uint32 )macAddress,
+						sStackEvent.uEvent.sApsDataIndEvent.uSrcAddress.u16Addr );
 
-            uint8 idByte = 0;
+				uint8 idByte = 0;
 
-            uint16 byteCount = PDUM_u16APduInstanceReadNBO(
-                    sStackEvent.uEvent.sApsDataIndEvent.hAPduInst,
-                    0,
-                    "b",
-                    &idByte
-                    );
+				uint16 byteCount = PDUM_u16APduInstanceReadNBO(
+						sStackEvent.uEvent.sApsDataIndEvent.hAPduInst,
+						0,
+						"b",
+						&idByte
+						);
 
-            if( byteCount == 1 )
-            {
-                switch( idByte )
-                {
-                case '*':
-                {
-                    DBG_vPrintf( TRACE_APP, "    ADC Values:\n" );
+				if( byteCount == 1 )
+				{
+					switch( idByte )
+					{
+					case '*':
+					{
+						DBG_vPrintf( TRACE_APP, "    ADC Values:\n" );
 
-                    struct
-                    {
-                        uint16 sampleValue;
-                        uint16 batteryValue;
-                    } values = { 0, 0 };
+						struct
+						{
+							uint16 sampleValue;
+							uint16 temperatureValue;
+							uint16 batteryValue;
+						} values = { 0, 0, 0 };
 
-                    byteCount = PDUM_u16APduInstanceReadNBO(
-                            sStackEvent.uEvent.sApsDataIndEvent.hAPduInst,
-                            1,
-                            "hh",
-                            &values
-                            );
-                    if( byteCount == 4 )
-                    {
-                        DBG_vPrintf( TRACE_APP, "        sampleValue  = 0x%04x\n",
-                                values.sampleValue );
-                        DBG_vPrintf( TRACE_APP, "        batteryValue = 0x%04x\n",
-                                values.batteryValue );
-#if SBC_UART_DISABLE == 0
-                        char dataString[24] = { 0 };
-                        uint8 i = 0;
-                        i += u16ToHex( &dataString[i], (uint16) (macAddress & 0xFFFF) );
-                        dataString[i++] = ',';
-                        i += u16ToHex( &dataString[i], (uint16) lqi );
-                        dataString[i++] = ':';
-                        dataString[i++] = '*';
-                        i += u16ToHex( &dataString[i], values.sampleValue );
-                        dataString[i++] = ',';
-                        i += u16ToHex( &dataString[i], values.batteryValue );
-                        dataString[i++] = '\n';
+						byteCount = PDUM_u16APduInstanceReadNBO(
+								sStackEvent.uEvent.sApsDataIndEvent.hAPduInst,
+								1,
+								"hhh",
+								&values
+								);
 
-                        u16AHI_UartBlockWriteData( E_AHI_UART_1, (uint8 *) dataString,
-                                strlen( dataString ) );
-#endif
-                    }
-                    else
-                    {
-                        // unexpected number of read bytes
+						if( byteCount )
+						{
+							DBG_vPrintf( TRACE_APP, "        sampleValue  = 0x%04x\n",
+									values.sampleValue );
+							DBG_vPrintf( TRACE_APP, "        temperatureValue  = 0x%04x\n",
+									values.temperatureValue );
+							DBG_vPrintf( TRACE_APP, "        batteryValue = 0x%04x\n",
+									values.batteryValue );
 
-                    }
+							#if SBC_UART_DISABLE == 0
 
-                    break;
-                }
-                case '!':
-                {
-                    DBG_vPrintf( TRACE_APP, "\n    Auth Code Request\n" );
+							char dataString[28] = { 0 };
+							uint8 i = 0;
+							i += u16ToHex( &dataString[i], (uint16) (macAddress & 0xFFFF) );
+							dataString[i++] = ',';
+							i += u16ToHex( &dataString[i], (uint16) lqi );
+							dataString[i++] = ':';
+							dataString[i++] = '*';
+							i += u16ToHex( &dataString[i], values.sampleValue );
+							dataString[i++] = ',';
+							i += u16ToHex( &dataString[i], values.temperatureValue );
+							dataString[i++] = ',';
+							i += u16ToHex( &dataString[i], values.batteryValue );
+							dataString[i++] = '\n';
 
-                    SendAuthCode( sStackEvent.uEvent.sApsDataIndEvent.uSrcAddress.u16Addr );
+							u16AHI_UartBlockWriteData( E_AHI_UART_1, (uint8 *) dataString,
+									strlen( dataString ) );
 
-                    break;
-                }
-                default:
-                    DBG_vPrintf( TRACE_APP, "Unrecognized Packet ID: 0x%x\n", idByte );
-                    break;
-                }
-            }
+							#endif
+						}
+						else
+						{
+							// unexpected number of read bytes
+						}
 
-            /* free the application protocol data unit (APDU) once it has been dealt with */
-            PDUM_eAPduFreeAPduInstance( sStackEvent.uEvent.sApsDataIndEvent.hAPduInst );
+						break;
+					}
+					case '!':
+					{
+						DBG_vPrintf( TRACE_APP, "\n    Auth Code Request\n" );
 
-            break;
-        }
-        case ZPS_EVENT_APS_DATA_CONFIRM:
-        {
-            DBG_vPrintf( TRACE_APP,
-                    "APP: APP_taskEndPoint: ZPS_EVENT_APS_DATA_CONFIRM Status %d, Address 0x%04x\n",
-                    sStackEvent.uEvent.sApsDataConfirmEvent.u8Status,
-                    sStackEvent.uEvent.sApsDataConfirmEvent.uDstAddr.u16Addr );
+						SendAuthCode( sStackEvent.uEvent.sApsDataIndEvent.uSrcAddress.u16Addr );
 
-            break;
-        }
-        case ZPS_EVENT_APS_DATA_ACK:
-        {
-            DBG_vPrintf( TRACE_APP,
-                    "APP: APP_taskEndPoint: ZPS_EVENT_APS_DATA_ACK Status %d, Address 0x%04x\n",
-                    sStackEvent.uEvent.sApsDataAckEvent.u8Status,
-                    sStackEvent.uEvent.sApsDataAckEvent.u16DstAddr );
+						break;
+					}
+					case '~':
+					{
+						uint16 nodeResponse;
 
-            break;
-        }
-        default:
-        {
-            DBG_vPrintf( TRACE_APP, "APP: APP_taskEndPoint: unhandled event %d\n",
-                    sStackEvent.eType );
+						byteCount = PDUM_u16APduInstanceReadNBO(
+									sStackEvent.uEvent.sApsDataIndEvent.hAPduInst,
+									1,
+									"h",
+									&nodeResponse);
 
-            break;
-        }
+						DBG_vPrintf( TRACE_APP, "\n    Config command ACK: 0x%04H\n",  nodeResponse);
+
+						#if SBC_UART_DISABLE == 0
+
+						char dataString[20] = { 0 };
+						uint8 i = 0;
+						i += u16ToHex( &dataString[i], (uint16) (macAddress & 0xFFFF) );
+						dataString[i++] = ',';
+						i += u16ToHex( &dataString[i], (uint16) lqi );
+						dataString[i++] = ':';
+						dataString[i++] = '~';
+						i += u16ToHex( &dataString[i], nodeResponse );
+						dataString[i++] = '\n';
+
+						u16AHI_UartBlockWriteData( E_AHI_UART_1, (uint8 *) dataString, strlen( dataString ) );
+						#endif
+
+						break;
+					}
+					case '$':
+					{
+						DBG_vPrintf( TRACE_APP, "\n    GO command ACK");
+
+						#if SBC_UART_DISABLE == 0
+
+						char dataString[20] = { 0 };
+						uint8 i = 0;
+						i += u16ToHex( &dataString[i], (uint16) (macAddress & 0xFFFF) );
+						dataString[i++] = ',';
+						i += u16ToHex( &dataString[i], (uint16) lqi );
+						dataString[i++] = ':';
+						dataString[i++] = '$';
+						dataString[i++] = 'G';
+						dataString[i++] = 'O';
+						dataString[i++] = '\n';
+
+						u16AHI_UartBlockWriteData( E_AHI_UART_1, (uint8 *) dataString, strlen( dataString ) );
+						#endif
+
+						break;
+					}
+					case '&':
+					{
+						DBG_vPrintf( TRACE_APP, "\n    Broadcast command response\n");
+
+						#if SBC_UART_DISABLE == 0
+
+						char dataString[35] = { 0 };
+						uint8 i = 0;
+						i += u16ToHex( &dataString[i], (uint16) (macAddress & 0xFFFF) );
+						dataString[i++] = ',';
+						i += u16ToHex( &dataString[i], (uint16) lqi );
+						dataString[i++] = ':';
+						dataString[i++] = '&';
+						i += u16ToHex( &dataString[i], (uint16) ((macAddress >> 48) & 0xFFFF) );
+						i += u16ToHex( &dataString[i], (uint16) ((macAddress >> 32) & 0xFFFF) );
+						i += u16ToHex( &dataString[i], (uint16) ((macAddress >> 16) & 0xFFFF) );
+						i += u16ToHex( &dataString[i], (uint16) (macAddress & 0xFFFF) );
+						dataString[i++] = '\n';
+
+						u16AHI_UartBlockWriteData( E_AHI_UART_1, (uint8 *) dataString, strlen( dataString ) );
+						#endif
+
+						break;
+					}
+					default:
+						DBG_vPrintf( TRACE_APP, "Unrecognized Packet ID: 0x%x\n", idByte );
+						break;
+					}
+				}
+
+				/* free the application protocol data unit (APDU) once it has been dealt with */
+				PDUM_eAPduFreeAPduInstance( sStackEvent.uEvent.sApsDataIndEvent.hAPduInst );
+
+				break;
+			}
+			case ZPS_EVENT_APS_DATA_CONFIRM:
+			{
+				DBG_vPrintf( TRACE_APP,
+						"APP: APP_taskEndPoint: ZPS_EVENT_APS_DATA_CONFIRM Status %d, Address 0x%04x\n",
+						sStackEvent.uEvent.sApsDataConfirmEvent.u8Status,
+						sStackEvent.uEvent.sApsDataConfirmEvent.uDstAddr.u16Addr );
+
+				break;
+			}
+			case ZPS_EVENT_APS_DATA_ACK:
+			{
+				DBG_vPrintf( TRACE_APP,
+						"APP: APP_taskEndPoint: ZPS_EVENT_APS_DATA_ACK Status %d, Address 0x%04x\n",
+						sStackEvent.uEvent.sApsDataAckEvent.u8Status,
+						sStackEvent.uEvent.sApsDataAckEvent.u16DstAddr );
+
+				break;
+			}
+			default:
+			{
+				DBG_vPrintf( TRACE_APP, "APP: APP_taskEndPoint: unhandled event %d\n",
+						sStackEvent.eType );
+
+				break;
+			}
         }
     }
 

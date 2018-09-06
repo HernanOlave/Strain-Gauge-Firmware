@@ -280,9 +280,9 @@ PWRM_CALLBACK(Wakeup)
      */
     DBG_vUartInit(DBG_E_UART_0, DBG_E_UART_BAUD_RATE_115200);
 
-    uint32 wakeStatus = u32AHI_DioWakeStatus();
-    if( wakeStatus & DIO13 )
+    if( !((1 << DIO13) & u32AHI_DioReadInput()) )
     {
+    	DBG_vPrintf(TRACE_APP, "APP: Config button pressed\n");
         configPressed_sed = TRUE;
         configPressed_ep  = TRUE;
     }

@@ -58,7 +58,6 @@ void ltc1661_sleep(void)
 	uint16_t tx = 0;
 
 	tx |= (LTC1661_CTRLCODE_SLEEP << 12);
-	DBG_vPrintf(TRACE_APP, "SPI: %x\n", tx);
 
 	LOWER_CS();
 

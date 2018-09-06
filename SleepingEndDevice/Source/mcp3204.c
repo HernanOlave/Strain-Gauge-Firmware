@@ -39,22 +39,11 @@
 #define LOWER_CS() do { vAHI_SpiWaitBusy(); vAHI_SpiSelect(1<<0); vAHI_SpiWaitBusy(); } while(0)
 #define RAISE_CS() do { vAHI_SpiWaitBusy(); vAHI_SpiSelect(0); vAHI_SpiWaitBusy(); } while(0)
 
-/**
- * @brief MCP3204 is represented by this structure.
- */
-typedef struct mcp3204
-{
-	uint16_t digitalValue;	/**< Output from the analog to digital conversion.*/
-	float referenceVoltage; /**< Reference voltage applied on the ADC.*/
-} MCP3204;
-
-MCP3204 ad;
-
 /*
  * The function configures the SPI interface of JN516x
  * according to MCP3204 SPI properties.
  */
-int MCP3204_init(SPIMode spi_mode, float ref_voltage)
+int MCP3204_init(SPIMode spi_mode)
 {
 	uint8_t bPolarity, bPhase;
 
@@ -77,8 +66,6 @@ int MCP3204_init(SPIMode spi_mode, float ref_voltage)
 			  	  	  E_AHI_SPIM_INT_DISABLE,
 			  	  	  E_AHI_SPIM_AUTOSLAVE_DSABL);
 
-	ad.referenceVoltage=ref_voltage;
-
 	return 0;
 }
 
@@ -86,7 +73,7 @@ int MCP3204_init(SPIMode spi_mode, float ref_voltage)
  * Start the AD conversion process and read the digital value
  * of the analog signal from MCP3204.
  */
-int MCP3204_convert(inputChannelMode channelMode, inputChannel channel)
+unsigned int MCP3204_convert(inputChannelMode channelMode, inputChannel channel)
 {
 	uint8_t tx;
 	uint32_t rx;
@@ -112,25 +99,7 @@ int MCP3204_convert(inputChannelMode channelMode, inputChannel channel)
 
 	rx = u16AHI_SpiReadTransfer16();
 
-	ad.digitalValue = rx & 0x0fff;
-
 	RAISE_CS();
 
-	return 0;
-}
-
-/*
- * The function returns the result from the AD conversion.
- */
-uint16_t MCP3204_getValue()
-{
-	return ad.digitalValue;
-}
-
-/*
- * The function calculates the value of the analog input.
- */
-float MCP3204_analogValue()
-{
-	return (ad.digitalValue*ad.referenceVoltage)/4096;
+	return rx & 0x0fff;
 }

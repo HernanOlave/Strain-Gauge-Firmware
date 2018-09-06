@@ -97,7 +97,7 @@ PUBLIC uint8 authTimer;
 tszQueue APP_msgStrainGaugeEvents;
 tszQueue APP_msgZpsEvents;
 
-bool_t configured = TRUE; //TODO Change to TRUE after testing
+bool_t configured = FALSE;
 bool_t wakeup = TRUE;
 
 uint16 samplePeriod = SAMPLE_RATE_DEFAULT;
@@ -239,16 +239,10 @@ void SendData()
         	ltc1661_setDAC_B(2000);
 
         	// Start ADC Conversion
-        	DBG_vPrintf(TRACE_APP, "APP: MCP3204_init...");
-        	MCP3204_init(0, 3.3);
-        	DBG_vPrintf(TRACE_APP, "OK\n");
-
-        	MCP3204_convert(0, 2);
-        	sensorValue = MCP3204_getValue();
-        	MCP3204_convert(0, 1);
-        	temperatureValue = MCP3204_getValue();
-        	MCP3204_convert(0, 0);
-        	batteryValue = MCP3204_getValue();
+        	MCP3204_init(0);
+        	sensorValue = MCP3204_convert(0, 2);
+        	temperatureValue = MCP3204_convert(0, 1);
+        	batteryValue = MCP3204_convert(0, 0);
 
         	DBG_vPrintf(TRACE_APP, "APP: sensorValue = %d - %x\n", sensorValue, sensorValue);
         	DBG_vPrintf(TRACE_APP, "APP: temperatureValue = %d - %x\n", temperatureValue, temperatureValue);
@@ -380,6 +374,56 @@ void vWaitForAuthCode()
             {
                 DBG_vPrintf(TRACE_APP, "AUTH: AUTH Code Confirmed\n");
 
+                // "Broadcast" command
+				DBG_vPrintf(TRACE_APP, "    Broadcast command received\n");
+
+				// allocate memory for APDU buffer with preconfigured "type"
+				PDUM_thAPduInstance data = PDUM_hAPduAllocateAPduInstance( apduMyData );
+				if( data == PDUM_INVALID_HANDLE )
+				{
+					// problem allocating APDU instance memory
+					DBG_vPrintf(TRACE_APP, "APP: Unable to allocate APDU memory\n");
+				}
+				else
+				{
+					// load payload data into APDU
+					uint16 byteCount = PDUM_u16APduInstanceWriteNBO(
+									   data,	// APDU instance handle
+									   0,		// APDU position for data
+									   "b",	// data format string
+									   '&');
+
+					if( byteCount == 0 )
+					{
+						// no data was written to the APDU instance
+						DBG_vPrintf(TRACE_APP, "APP: No data written to APDU\n");
+					}
+					else
+					{
+						PDUM_eAPduInstanceSetPayloadSize( data, byteCount );
+						DBG_vPrintf(TRACE_APP, "APP: Data written to APDU: %d\n", byteCount);
+
+						// request data send to destination
+						PDM_teStatus status = ZPS_eAplAfUnicastDataReq(
+								 data,					// APDU instance handle
+								 0xFFFF,					// cluster ID
+								 1,						// source endpoint
+								 1,						// destination endpoint
+								 0x0000,					// destination network address
+								 ZPS_E_APL_AF_UNSECURE,	// security mode
+								 0,						// radius
+								 NULL);					// sequence number pointer
+
+						if( status != ZPS_E_SUCCESS )
+						{
+							// problem with request
+							DBG_vPrintf(TRACE_APP, "APP: AckDataReq not successful. Return: 0x%x\n", status);
+							DBG_vPrintf(TRACE_APP, "ERROR: EPID: 0x%016llx\n", ZPS_u64AplZdoGetNetworkExtendedPanId());
+							DBG_vPrintf(TRACE_APP, "ERROR: Node State:  %d\n",s_eDeviceState.eNodeState);
+						}
+					}
+				}
+
                 ZTIMER_eClose( authTimer );
 
                 AuthNetwork();
@@ -502,11 +546,58 @@ void vRunning()
                         {
                             DBG_vPrintf(TRACE_APP, "APP: Data RX: sample period save error: 0x%x\n", status);
                         }
+
+                        // allocate memory for APDU buffer with preconfigured "type"
+                        PDUM_thAPduInstance data = PDUM_hAPduAllocateAPduInstance( apduMyData );
+                        if( data == PDUM_INVALID_HANDLE )
+                        {
+                        	// problem allocating APDU instance memory
+                            DBG_vPrintf(TRACE_APP, "APP: Unable to allocate APDU memory\n");
+                        }
+                        else
+                        {
+                        	// load payload data into APDU
+                        	uint16 byteCount = PDUM_u16APduInstanceWriteNBO(
+                        	                   data,	// APDU instance handle
+                        	                   0,		// APDU position for data
+                        	                   "bh",	// data format string
+                        	                   '~',
+                        	                   periodValue);
+
+                        	if( byteCount == 0 )
+                        	{
+                        		// no data was written to the APDU instance
+                        	    DBG_vPrintf(TRACE_APP, "APP: No data written to APDU\n");
+                        	}
+                        	else
+                        	{
+                        		PDUM_eAPduInstanceSetPayloadSize( data, byteCount );
+                        		DBG_vPrintf(TRACE_APP, "APP: Data written to APDU: %d\n", byteCount);
+
+                        		// request data send to destination
+                        		status = ZPS_eAplAfUnicastDataReq(
+                        	             data,					// APDU instance handle
+                        	             0xFFFF,					// cluster ID
+                        	             1,						// source endpoint
+                        	             1,						// destination endpoint
+                        	             0x0000,					// destination network address
+                        	             ZPS_E_APL_AF_UNSECURE,	// security mode
+                        	             0,						// radius
+                        	             NULL);					// sequence number pointer
+
+                        	    if( status != ZPS_E_SUCCESS )
+                        	    {
+                        	    	// problem with request
+                        	        DBG_vPrintf(TRACE_APP, "APP: AckDataReq not successful. Return: 0x%x\n", status);
+                        	        DBG_vPrintf(TRACE_APP, "ERROR: EPID: 0x%016llx\n", ZPS_u64AplZdoGetNetworkExtendedPanId());
+                        	        DBG_vPrintf(TRACE_APP, "ERROR: Node State:  %d\n",s_eDeviceState.eNodeState);
+                        	    }
+                        	}
+                        }
                     }
                     else
                     {
-                        // unexpected number of read bytes
-
+                    	DBG_vPrintf(TRACE_APP, "APP: unexpected number of read bytes\n");
                     }
 
                     break;
@@ -529,7 +620,106 @@ void vRunning()
                         DBG_vPrintf(TRACE_APP, "APP: Data RX: configured save error: 0x%x\n", status);
                     }
 
-                    break;
+                    // allocate memory for APDU buffer with preconfigured "type"
+					PDUM_thAPduInstance data = PDUM_hAPduAllocateAPduInstance( apduMyData );
+					if( data == PDUM_INVALID_HANDLE )
+					{
+						// problem allocating APDU instance memory
+						DBG_vPrintf(TRACE_APP, "APP: Unable to allocate APDU memory\n");
+					}
+					else
+					{
+						// load payload data into APDU
+						uint16 byteCount = PDUM_u16APduInstanceWriteNBO(
+										   data,	// APDU instance handle
+										   0,		// APDU position for data
+										   "bbb",	// data format string
+										   '$',
+										   'G',
+										   'O');
+
+						if( byteCount == 0 )
+						{
+							// no data was written to the APDU instance
+							DBG_vPrintf(TRACE_APP, "APP: No data written to APDU\n");
+						}
+						else
+						{
+							PDUM_eAPduInstanceSetPayloadSize( data, byteCount );
+							DBG_vPrintf(TRACE_APP, "APP: Data written to APDU: %d\n", byteCount);
+
+							// request data send to destination
+							status = ZPS_eAplAfUnicastDataReq(
+									 data,					// APDU instance handle
+									 0xFFFF,					// cluster ID
+									 1,						// source endpoint
+									 1,						// destination endpoint
+									 0x0000,					// destination network address
+									 ZPS_E_APL_AF_UNSECURE,	// security mode
+									 0,						// radius
+									 NULL);					// sequence number pointer
+
+							if( status != ZPS_E_SUCCESS )
+							{
+								// problem with request
+								DBG_vPrintf(TRACE_APP, "APP: AckDataReq not successful. Return: 0x%x\n", status);
+								DBG_vPrintf(TRACE_APP, "ERROR: EPID: 0x%016llx\n", ZPS_u64AplZdoGetNetworkExtendedPanId());
+								DBG_vPrintf(TRACE_APP, "ERROR: Node State:  %d\n",s_eDeviceState.eNodeState);
+							}
+						}
+					}
+                }
+                case '&':
+				{
+					// "Broadcast" command
+					DBG_vPrintf(TRACE_APP, "    Broadcast command received\n");
+
+					// allocate memory for APDU buffer with preconfigured "type"
+					PDUM_thAPduInstance data = PDUM_hAPduAllocateAPduInstance( apduMyData );
+					if( data == PDUM_INVALID_HANDLE )
+					{
+						// problem allocating APDU instance memory
+						DBG_vPrintf(TRACE_APP, "APP: Unable to allocate APDU memory\n");
+					}
+					else
+					{
+						// load payload data into APDU
+						uint16 byteCount = PDUM_u16APduInstanceWriteNBO(
+										   data,	// APDU instance handle
+										   0,		// APDU position for data
+										   "b",	// data format string
+										   '&');
+
+						if( byteCount == 0 )
+						{
+							// no data was written to the APDU instance
+							DBG_vPrintf(TRACE_APP, "APP: No data written to APDU\n");
+						}
+						else
+						{
+							PDUM_eAPduInstanceSetPayloadSize( data, byteCount );
+							DBG_vPrintf(TRACE_APP, "APP: Data written to APDU: %d\n", byteCount);
+
+							// request data send to destination
+							PDM_teStatus status = ZPS_eAplAfUnicastDataReq(
+									 data,					// APDU instance handle
+									 0xFFFF,					// cluster ID
+									 1,						// source endpoint
+									 1,						// destination endpoint
+									 0x0000,					// destination network address
+									 ZPS_E_APL_AF_UNSECURE,	// security mode
+									 0,						// radius
+									 NULL);					// sequence number pointer
+
+							if( status != ZPS_E_SUCCESS )
+							{
+								// problem with request
+								DBG_vPrintf(TRACE_APP, "APP: AckDataReq not successful. Return: 0x%x\n", status);
+								DBG_vPrintf(TRACE_APP, "ERROR: EPID: 0x%016llx\n", ZPS_u64AplZdoGetNetworkExtendedPanId());
+								DBG_vPrintf(TRACE_APP, "ERROR: Node State:  %d\n",s_eDeviceState.eNodeState);
+							}
+						}
+					}
                 }
                 default:
                     DBG_vPrintf(TRACE_APP, "Unrecognized Packet ID: 0x%x\n", idByte);
@@ -582,10 +772,12 @@ void APP_vtaskMyEndPoint (void)
 {
     if( configPressed_ep )
     {
+    	DBG_vPrintf(TRACE_APP, "\nENDPOINT: CONFIG Reset Detected\n\n");
+
         configPressed_ep = FALSE;
         PDM_vDeleteDataRecord( PDM_APP_ID_SAMPLE_PERIOD );
         PDM_vDeleteDataRecord( PDM_APP_ID_CONFIGURED );
-        configured = TRUE;  // TODO change to FALSE after testing
+        configured = FALSE;
 
         endPointState = EP_STATE_INIT;
     }
@@ -688,6 +880,56 @@ void APP_vtaskMyEndPoint (void)
                 }
             }
 	    }
+
+	    // "Broadcast" command
+		DBG_vPrintf(TRACE_APP, "    sending Broadcast command\n");
+
+		// allocate memory for APDU buffer with preconfigured "type"
+		PDUM_thAPduInstance data = PDUM_hAPduAllocateAPduInstance( apduMyData );
+		if( data == PDUM_INVALID_HANDLE )
+		{
+			// problem allocating APDU instance memory
+			DBG_vPrintf(TRACE_APP, "APP: Unable to allocate APDU memory\n");
+		}
+		else
+		{
+			// load payload data into APDU
+			uint16 byteCount = PDUM_u16APduInstanceWriteNBO(
+							   data,	// APDU instance handle
+							   0,		// APDU position for data
+							   "b",	// data format string
+							   '&');
+
+			if( byteCount == 0 )
+			{
+				// no data was written to the APDU instance
+				DBG_vPrintf(TRACE_APP, "APP: No data written to APDU\n");
+			}
+			else
+			{
+				PDUM_eAPduInstanceSetPayloadSize( data, byteCount );
+				DBG_vPrintf(TRACE_APP, "APP: Data written to APDU: %d\n", byteCount);
+
+				// request data send to destination
+				PDM_teStatus status = ZPS_eAplAfUnicastDataReq(
+						 data,					// APDU instance handle
+						 0xFFFF,					// cluster ID
+						 1,						// source endpoint
+						 1,						// destination endpoint
+						 0x0000,					// destination network address
+						 ZPS_E_APL_AF_UNSECURE,	// security mode
+						 0,						// radius
+						 NULL);					// sequence number pointer
+
+				if( status != ZPS_E_SUCCESS )
+				{
+					// problem with request
+					DBG_vPrintf(TRACE_APP, "APP: AckDataReq not successful. Return: 0x%x\n", status);
+					DBG_vPrintf(TRACE_APP, "ERROR: EPID: 0x%016llx\n", ZPS_u64AplZdoGetNetworkExtendedPanId());
+					DBG_vPrintf(TRACE_APP, "ERROR: Node State:  %d\n",s_eDeviceState.eNodeState);
+				}
+			}
+		}
 
 	    // Initialize External ADC Here (if needed)
 	    // ADC_INIT

@@ -85,7 +85,7 @@ typedef enum spiMode
  *
  * @return int 0 for successfull initialization, 1 in case of error.
  */
-int MCP3204_init(SPIMode spi_mode, float ref_voltage);
+int MCP3204_init(SPIMode spi_mode);
 
 /**
  * @brief Starts the AD conversion process and read the digital value
@@ -97,25 +97,9 @@ int MCP3204_init(SPIMode spi_mode, float ref_voltage);
  *
  * @return int 0 for successfull conversion 1 in case of failure.
  */
-int MCP3204_convert(inputChannelMode channelMode, inputChannel channel);
+unsigned int MCP3204_convert(inputChannelMode channelMode, inputChannel channel);
 
-/**
- * @brief The function returns the result from the AD conversion.
- *
- * @param[in] ad structure that represents MCP3204.
- *
- * @return uint16_t output from the AD conversion.
- */
-uint16_t MCP3204_getValue(void);
 
-/**
- * @brief The function calculates the value of the analog input.
- *
- * @param[in] ad structure that represents MCP3204.
- *
- * @return float value of the analog input.
- */
-float MCP3204_analogValue(void);
 /* @} */
 
 #endif /* MCP3204_H_ */
