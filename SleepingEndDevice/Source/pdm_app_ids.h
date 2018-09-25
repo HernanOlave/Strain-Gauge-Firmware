@@ -15,6 +15,9 @@ enum {
     PDM_APP_ID_CONFIGURED,              // flag indicating configuration is finished and device is active
     PDM_APP_ID_EPID,                    // EPID of current/last authorized network
     PDM_APP_ID_BLACKLIST,               // list of incompatible network EPIDs
+    PDM_APP_ID_CHANNEL_A,
+    PDM_APP_ID_CHANNEL_B,
+    PDM_APP_ID_GAIN,
 };
 
 #endif /* PDM_APP_IDS_H_ */

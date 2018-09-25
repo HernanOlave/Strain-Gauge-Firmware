@@ -248,6 +248,14 @@ void ProcessUART()
             //	~aaaa,pppp\n (a = last 4 of End Device MAC address, p = sample period in HEX)
             uint16 destMacAddrStub = strtol( &uartRxBuffer[1], NULL, 16 );
             uint16 period = strtol( &uartRxBuffer[6], NULL, 16 );
+            uint16 channelA = strtol( &uartRxBuffer[11], NULL, 16 );
+            uint16 channelB = strtol( &uartRxBuffer[16], NULL, 16 );
+            uint16 gainValue = strtol( &uartRxBuffer[21], NULL, 16 );
+
+            DBG_vPrintf( TRACE_APP, "   Period Value: %d\n", period );
+            DBG_vPrintf( TRACE_APP, "   Channel A Value: %d\n", channelA );
+            DBG_vPrintf( TRACE_APP, "   Channel B Value: %d\n", channelB );
+            DBG_vPrintf( TRACE_APP, "   Gain Value: %d\n", gainValue );
 
             uint16 destNetAddr;
 
@@ -271,8 +279,12 @@ void ProcessUART()
                     // load payload data into APDU
                     uint16 byteCount = PDUM_u16APduInstanceWriteNBO( data,	// APDU instance handle
                             0,		// APDU position for data
-                            "bh",	// data format string
-                            '~', period );
+                            "bhhhh",	// data format string
+                            '~',
+                            period,
+                            channelA,
+                            channelB,
+                            gainValue);
                     if( byteCount == 0 )
                     {
                         // no data was written to the APDU instance
@@ -649,26 +661,38 @@ void APP_vtaskMyEndPoint( void )
 					}
 					case '~':
 					{
-						uint16 nodeResponse;
+						struct
+						{
+							uint16 periodValue;
+							uint16 channelA;
+							uint16 channelB;
+							uint16 gainValue;
+						} values = { 0 };
 
 						byteCount = PDUM_u16APduInstanceReadNBO(
 									sStackEvent.uEvent.sApsDataIndEvent.hAPduInst,
 									1,
-									"h",
-									&nodeResponse);
+									"hhhh",
+									&values);
 
-						DBG_vPrintf( TRACE_APP, "\n    Config command ACK: 0x%04H\n",  nodeResponse);
+						DBG_vPrintf( TRACE_APP, "\n    Config command ACK\n");
 
 						#if SBC_UART_DISABLE == 0
 
-						char dataString[20] = { 0 };
+						char dataString[35] = { 0 };
 						uint8 i = 0;
 						i += u16ToHex( &dataString[i], (uint16) (macAddress & 0xFFFF) );
 						dataString[i++] = ',';
 						i += u16ToHex( &dataString[i], (uint16) lqi );
 						dataString[i++] = ':';
 						dataString[i++] = '~';
-						i += u16ToHex( &dataString[i], nodeResponse );
+						i += u16ToHex( &dataString[i], values.periodValue );
+						dataString[i++] = ',';
+						i += u16ToHex( &dataString[i], values.channelA );
+						dataString[i++] = ',';
+						i += u16ToHex( &dataString[i], values.channelB );
+						dataString[i++] = ',';
+						i += u16ToHex( &dataString[i], values.gainValue );
 						dataString[i++] = '\n';
 
 						u16AHI_UartBlockWriteData( E_AHI_UART_1, (uint8 *) dataString, strlen( dataString ) );

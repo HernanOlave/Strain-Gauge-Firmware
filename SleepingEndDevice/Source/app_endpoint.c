@@ -58,9 +58,12 @@
 	#define TRACE_APP 	TRUE
 #endif
 
-#define NO_NETWORK_SLEEP_DUR        10  // seconds
+#define NO_NETWORK_SLEEP_DUR        10   // seconds
 #define CONFIG_STATE_SLEEP_DUR      10   // seconds
 #define SAMPLE_RATE_DEFAULT         10   // seconds
+#define CHANNEL_A_VALUE_DEFAULT		2000 // raw value
+#define CHANNEL_B_VALUE_DEFAULT		2000 // raw value
+#define GAIN_VALUE_DEFAULT			16	 // times
 
 #define DIO17						17
 #define ENABLE_3VLN() 				vAHI_DioSetDirection(0x0,(1 << DIO17)); vAHI_DioSetOutput((1 << DIO17), 0x0);
@@ -100,7 +103,10 @@ tszQueue APP_msgZpsEvents;
 bool_t configured = FALSE;
 bool_t wakeup = TRUE;
 
-uint16 samplePeriod = SAMPLE_RATE_DEFAULT;
+uint16 samplePeriod = 	SAMPLE_RATE_DEFAULT;
+uint16 channelAValue = 	CHANNEL_A_VALUE_DEFAULT;
+uint16 channelBValue = 	CHANNEL_B_VALUE_DEFAULT;
+uint16 gainValue = 		GAIN_VALUE_DEFAULT;
 
 enum {
 	EP_STATE_INIT,
@@ -232,11 +238,11 @@ void SendData()
         	ENABLE_3VLN();
         	ad8231_init();
         	ad8231_enable();
-        	ad8231_setGain(AD8231_GAIN_16);
+        	ad8231_setGain(gainValue);
 
         	ltc1661_init();
-        	ltc1661_setDAC_A(2000);
-        	ltc1661_setDAC_B(2000);
+        	ltc1661_setDAC_A(channelAValue);
+        	ltc1661_setDAC_B(channelBValue);
 
         	// Start ADC Conversion
         	MCP3204_init(0);
@@ -248,7 +254,7 @@ void SendData()
         	DBG_vPrintf(TRACE_APP, "APP: temperatureValue = %d - %x\n", temperatureValue, temperatureValue);
         	DBG_vPrintf(TRACE_APP, "APP: batteryValue = %d - %x\n", batteryValue, batteryValue);
 
-        	ad8231_setGain(AD8231_GAIN_1);
+        	//ad8231_setGain(AD8231_GAIN_1);
         	//ltc1661_setDAC_A(0);
         	//ltc1661_setDAC_B(0);
 
@@ -535,20 +541,34 @@ void vRunning()
                 {
                     DBG_vPrintf(TRACE_APP, "    Data Values:\n");
 
-                    uint16 periodValue;
+                    struct
+					{
+						uint16 inSamplePeriod;
+						uint16 inChannelAValue;
+						uint16 inChannelBValue;
+						uint16 inGainValue;
+					} values = { 0 };
 
                     byteCount = PDUM_u16APduInstanceReadNBO(
                             sStackEvent.uEvent.sApsDataIndEvent.hAPduInst,
                             1,
-                            "h",
-                            &periodValue
-                    );
-                    if( byteCount == 2 )
-                    {
-                        DBG_vPrintf(TRACE_APP, "        periodValue = 0x%04x\n", periodValue);
-                        samplePeriod = periodValue;
+                            "hhhh",
+                            &values);
 
-                        // save new value
+                    if( byteCount == 8 )
+                    {
+
+                    	samplePeriod = values.inSamplePeriod;
+						channelAValue = values.inChannelAValue;
+						channelBValue = values.inChannelBValue;
+						gainValue = values.inGainValue;
+
+                        DBG_vPrintf(TRACE_APP, "        samplePeriod = 0x%04x\n", samplePeriod);
+                        DBG_vPrintf(TRACE_APP, "        channelA = 0x%04x\n", channelAValue);
+                        DBG_vPrintf(TRACE_APP, "        channelB = 0x%04x\n", channelBValue);
+                        DBG_vPrintf(TRACE_APP, "        gainValue = 0x%04x\n", gainValue);
+
+                        // save new values
                         PDM_teStatus status = PDM_eSaveRecordData(
                                 PDM_APP_ID_SAMPLE_PERIOD,
                                 &samplePeriod,
@@ -556,9 +576,34 @@ void vRunning()
                         );
 
                         if( status != PDM_E_STATUS_OK )
-                        {
                             DBG_vPrintf(TRACE_APP, "APP: Data RX: sample period save error: 0x%x\n", status);
-                        }
+
+                        status = PDM_eSaveRecordData(
+								PDM_APP_ID_CHANNEL_A,
+								&channelAValue,
+								sizeof(channelAValue)
+						);
+
+						if( status != PDM_E_STATUS_OK )
+							DBG_vPrintf(TRACE_APP, "APP: Data RX: channel A value save error: 0x%x\n", status);
+
+						status = PDM_eSaveRecordData(
+								PDM_APP_ID_CHANNEL_B,
+								&channelBValue,
+								sizeof(channelBValue)
+						);
+
+						if( status != PDM_E_STATUS_OK )
+							DBG_vPrintf(TRACE_APP, "APP: Data RX: channel B value save error: 0x%x\n", status);
+
+						status = PDM_eSaveRecordData(
+								PDM_APP_ID_GAIN,
+								&gainValue,
+								sizeof(gainValue)
+						);
+
+						if( status != PDM_E_STATUS_OK )
+							DBG_vPrintf(TRACE_APP, "APP: Data RX: gain value save error: 0x%x\n", status);
 
                         // allocate memory for APDU buffer with preconfigured "type"
                         PDUM_thAPduInstance data = PDUM_hAPduAllocateAPduInstance( apduMyData );
@@ -573,9 +618,12 @@ void vRunning()
                         	uint16 byteCount = PDUM_u16APduInstanceWriteNBO(
                         	                   data,	// APDU instance handle
                         	                   0,		// APDU position for data
-                        	                   "bh",	// data format string
+                        	                   "bhhhh",	// data format string
                         	                   '~',
-                        	                   periodValue);
+                        	                   samplePeriod,
+                        	                   channelAValue,
+                        	                   channelBValue,
+                        	                   gainValue);
 
                         	if( byteCount == 0 )
                         	{
@@ -610,7 +658,7 @@ void vRunning()
                     }
                     else
                     {
-                    	DBG_vPrintf(TRACE_APP, "APP: unexpected number of read bytes\n");
+                    	DBG_vPrintf(TRACE_APP, "APP: unexpected number of read bytes = %d\n", byteCount);
                     }
 
                     break;
