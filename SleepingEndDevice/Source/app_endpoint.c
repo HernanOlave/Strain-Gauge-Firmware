@@ -235,7 +235,6 @@ void SendData()
         {
         	int sensorValue, temperatureValue, batteryValue;
 
-        	ENABLE_3VLN();
         	ad8231_init();
         	ad8231_enable();
         	ad8231_setGain(gainValue);
@@ -850,6 +849,14 @@ void APP_vtaskMyEndPoint (void)
 	{
 	case EP_STATE_INIT:
 	{
+		//send DAC and OPAMP to low power
+		ENABLE_3VLN();
+		ad8231_init();
+		ad8231_enable();
+		ltc1661_init();
+		ad8231_disable();
+		ltc1661_sleep();
+
 		// load NV configuration
 	    {
             // if sample period NV record doesn't exist,
