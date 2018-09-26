@@ -838,6 +838,9 @@ void APP_vtaskMyEndPoint (void)
         configPressed_ep = FALSE;
         PDM_vDeleteDataRecord( PDM_APP_ID_SAMPLE_PERIOD );
         PDM_vDeleteDataRecord( PDM_APP_ID_CONFIGURED );
+        PDM_vDeleteDataRecord( PDM_APP_ID_CHANNEL_A );
+        PDM_vDeleteDataRecord( PDM_APP_ID_CHANNEL_B );
+        PDM_vDeleteDataRecord( PDM_APP_ID_GAIN );
         configured = FALSE;
 
         endPointState = EP_STATE_INIT;
@@ -941,6 +944,147 @@ void APP_vtaskMyEndPoint (void)
                 }
             }
 	    }
+
+	    {
+			// if channel A value NV record doesn't exist,
+			// create one with the defaul value
+			uint16 byteCount;
+			bool_t dataExists = PDM_bDoesDataExist( PDM_APP_ID_CHANNEL_A, &byteCount );
+			if( !dataExists || (byteCount != sizeof(channelAValue)) )
+			{
+				if( byteCount != sizeof(channelAValue) )
+				{
+					DBG_vPrintf(TRACE_APP, "APP_INIT: channel A NV size mismatch (NV size = %d)\n", byteCount);
+				}
+
+				// the record does NOT exist in NV memory or size mismatch
+				// create a (new) record with the default value
+				PDM_teStatus status;
+				status = PDM_eSaveRecordData(
+						PDM_APP_ID_CHANNEL_A,
+						&channelAValue,
+						sizeof(channelAValue)
+				);
+
+				if( status != PDM_E_STATUS_OK )
+				{
+					DBG_vPrintf(TRACE_APP, "APP_INIT: channel A NV save error: 0x%x\n", status);
+				}
+			}
+
+			else
+			{
+				// the record does exist in NV memory
+				// read the record and set the variable
+				uint16 bytesRead;
+				PDM_teStatus status;
+				status = PDM_eReadDataFromRecord(
+						PDM_APP_ID_CHANNEL_A,
+						&channelAValue,
+						sizeof(channelAValue),
+						&bytesRead
+				);
+
+				if( status != PDM_E_STATUS_OK )
+				{
+					DBG_vPrintf(TRACE_APP, "APP_INIT: channel A NV load error: 0x%x\n", status);
+				}
+			}
+		}
+
+	    {
+			// if channel B value NV record doesn't exist,
+			// create one with the default value
+			uint16 byteCount;
+			bool_t dataExists = PDM_bDoesDataExist( PDM_APP_ID_CHANNEL_B, &byteCount );
+			if( !dataExists || (byteCount != sizeof(channelBValue)) )
+			{
+				if( byteCount != sizeof(channelBValue) )
+				{
+					DBG_vPrintf(TRACE_APP, "APP_INIT: channel B NV size mismatch (NV size = %d)\n", byteCount);
+				}
+
+				// the record does NOT exist in NV memory or size mismatch
+				// create a (new) record with the default value
+				PDM_teStatus status;
+				status = PDM_eSaveRecordData(
+						PDM_APP_ID_CHANNEL_B,
+						&channelBValue,
+						sizeof(channelBValue)
+				);
+
+				if( status != PDM_E_STATUS_OK )
+				{
+					DBG_vPrintf(TRACE_APP, "APP_INIT: channel B NV save error: 0x%x\n", status);
+				}
+			}
+
+			else
+			{
+				// the record does exist in NV memory
+				// read the record and set the variable
+				uint16 bytesRead;
+				PDM_teStatus status;
+				status = PDM_eReadDataFromRecord(
+						PDM_APP_ID_CHANNEL_B,
+						&channelBValue,
+						sizeof(channelBValue),
+						&bytesRead
+				);
+
+				if( status != PDM_E_STATUS_OK )
+				{
+					DBG_vPrintf(TRACE_APP, "APP_INIT: channel B NV load error: 0x%x\n", status);
+				}
+			}
+		}
+
+	    {
+			// if gain value NV record doesn't exist,
+			// create one with the default value
+			uint16 byteCount;
+			bool_t dataExists = PDM_bDoesDataExist( PDM_APP_ID_GAIN, &byteCount );
+			if( !dataExists || (byteCount != sizeof(gainValue)) )
+			{
+				if( byteCount != sizeof(gainValue) )
+				{
+					DBG_vPrintf(TRACE_APP, "APP_INIT: gain NV size mismatch (NV size = %d)\n", byteCount);
+				}
+
+				// the record does NOT exist in NV memory or size mismatch
+				// create a (new) record with the default value
+				PDM_teStatus status;
+				status = PDM_eSaveRecordData(
+						PDM_APP_ID_GAIN,
+						&gainValue,
+						sizeof(gainValue)
+				);
+
+				if( status != PDM_E_STATUS_OK )
+				{
+					DBG_vPrintf(TRACE_APP, "APP_INIT: gain NV save error: 0x%x\n", status);
+				}
+			}
+
+			else
+			{
+				// the record does exist in NV memory
+				// read the record and set the variable
+				uint16 bytesRead;
+				PDM_teStatus status;
+				status = PDM_eReadDataFromRecord(
+						PDM_APP_ID_GAIN,
+						&gainValue,
+						sizeof(gainValue),
+						&bytesRead
+				);
+
+				if( status != PDM_E_STATUS_OK )
+				{
+					DBG_vPrintf(TRACE_APP, "APP_INIT: gain NV load error: 0x%x\n", status);
+				}
+			}
+		}
 
 	    // "Broadcast" command
 		DBG_vPrintf(TRACE_APP, "    sending Broadcast command\n");
