@@ -49,10 +49,14 @@
 /***        Macro Definitions                                             ***/
 /****************************************************************************/
 #ifndef DEBUG_APP
-#define TRACE_APP 	FALSE
+#define TRACE_APP 		FALSE
 #else
-#define TRACE_APP 	TRUE
+#define TRACE_APP 		TRUE
 #endif
+
+#define DIO16			16
+#define LED_OFF() 		vAHI_DioSetDirection(0x0,(1 << DIO16)); vAHI_DioSetOutput((1 << DIO16), 0x0);
+#define LED_ON() 		vAHI_DioSetDirection(0x0,(1 << DIO16)); vAHI_DioSetOutput(0x0, (1 << DIO16));
 
 /****************************************************************************/
 /***        Type Definitions                                              ***/
@@ -594,6 +598,7 @@ void APP_vtaskMyEndPoint( void )
 
 				if( byteCount == 1 )
 				{
+					LED_ON();
 					switch( idByte )
 					{
 					case '*':
@@ -750,6 +755,7 @@ void APP_vtaskMyEndPoint( void )
 						DBG_vPrintf( TRACE_APP, "Unrecognized Packet ID: 0x%x\n", idByte );
 						break;
 					}
+					LED_OFF();
 				}
 
 				/* free the application protocol data unit (APDU) once it has been dealt with */

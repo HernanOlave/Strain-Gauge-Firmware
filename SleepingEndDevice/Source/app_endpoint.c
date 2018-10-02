@@ -235,6 +235,8 @@ void SendData()
         {
         	int sensorValue, temperatureValue, batteryValue;
 
+        	DISABLE_3VLN();
+
         	ad8231_init();
         	ad8231_enable();
         	ad8231_setGain(gainValue);
@@ -266,9 +268,9 @@ void SendData()
         	vAHI_DioSetDirection(0x0,(1 << 19)); vAHI_DioSetOutput(0x0, (1 << 19)); //ADC
         	vAHI_DioSetDirection(0x0,(1 << 8)); vAHI_DioSetOutput(0, (1 << 8)); //SDN
 
-        	vAHI_SpiDisable();
+        	vAHI_SpiDisable();*/
 
-        	DISABLE_3VLN();*/
+        	ENABLE_3VLN();
 
             // load payload data into APDU
             uint16 byteCount = PDUM_u16APduInstanceWriteNBO(
