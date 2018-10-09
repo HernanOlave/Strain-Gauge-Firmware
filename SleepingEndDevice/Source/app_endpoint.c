@@ -50,12 +50,12 @@
 /****************************************************************************/
 /***        Macro Definitions                                             ***/
 /****************************************************************************/
-#define AUTH_TIMEOUT    6       // seconds
+#define AUTH_TIMEOUT    			6	// seconds
 
 #ifndef DEBUG_APP
-	#define TRACE_APP 	FALSE
+	#define TRACE_APP 				FALSE
 #else
-	#define TRACE_APP 	TRUE
+	#define TRACE_APP 				TRUE
 #endif
 
 #define NO_NETWORK_SLEEP_DUR        10   // seconds
@@ -69,8 +69,11 @@
 #define ENABLE_3VLN() 				vAHI_DioSetDirection(0x0,(1 << DIO17)); vAHI_DioSetOutput((1 << DIO17), 0x0);
 #define DISABLE_3VLN() 				vAHI_DioSetDirection(0x0,(1 << DIO17)); vAHI_DioSetOutput(0x0, (1 << DIO17));
 
-#define SECS_TO_TICKS( seconds )	seconds * 32768
+#define DIO12						12
+#define ENABLE_POWERSAVE() 			vAHI_DioSetDirection(0x0,(1 << DIO12)); vAHI_DioSetOutput((1 << DIO12), 0x0);
+#define DISABLE_POWERSAVE() 		vAHI_DioSetDirection(0x0,(1 << DIO12)); vAHI_DioSetOutput(0x0, (1 << DIO12));
 
+#define SECS_TO_TICKS( seconds )	seconds * 32768
 
 /****************************************************************************/
 /***        Type Definitions                                              ***/
