@@ -70,8 +70,12 @@
 #define DISABLE_3VLN() 				vAHI_DioSetDirection(0x0,(1 << DIO17)); vAHI_DioSetOutput(0x0, (1 << DIO17));
 
 #define DIO12						12
-#define ENABLE_POWERSAVE() 			vAHI_DioSetDirection(0x0,(1 << DIO12)); vAHI_DioSetOutput((1 << DIO12), 0x0);
-#define DISABLE_POWERSAVE() 		vAHI_DioSetDirection(0x0,(1 << DIO12)); vAHI_DioSetOutput(0x0, (1 << DIO12));
+#define ENABLE_POWERSAVE() 			vAHI_DioSetDirection(0x0,(1 << DIO12)); vAHI_DioSetOutput(0x0, (1 << DIO12));
+#define DISABLE_POWERSAVE() 		vAHI_DioSetDirection(0x0,(1 << DIO12)); vAHI_DioSetOutput((1 << DIO12), 0x0);
+
+#define DIO11						11
+#define ENABLE_WB() 				vAHI_DioSetDirection(0x0,(1 << DIO11)); vAHI_DioSetOutput(0x0, (1 << DIO11));
+#define DISABLE_WB() 				vAHI_DioSetDirection(0x0,(1 << DIO11)); vAHI_DioSetOutput((1 << DIO11), 0x0);
 
 #define SECS_TO_TICKS( seconds )	seconds * 32768
 
@@ -238,7 +242,8 @@ void SendData()
         {
         	int sensorValue, temperatureValue, batteryValue;
 
-        	DISABLE_3VLN();
+        	DISABLE_POWERSAVE();
+        	ENABLE_WB();
 
         	ad8231_init();
         	ad8231_enable();
@@ -258,22 +263,11 @@ void SendData()
         	DBG_vPrintf(TRACE_APP, "APP: temperatureValue = %d - %x\n", temperatureValue, temperatureValue);
         	DBG_vPrintf(TRACE_APP, "APP: batteryValue = %d - %x\n", batteryValue, batteryValue);
 
-        	//ad8231_setGain(AD8231_GAIN_1);
-        	//ltc1661_setDAC_A(0);
-        	//ltc1661_setDAC_B(0);
-
         	ad8231_disable();
         	ltc1661_sleep();
 
-        	/*vAHI_DioSetDirection(0x0,(1 << 0)); vAHI_DioSetOutput(0x0, (1 << 0));
-        	vAHI_DioSetDirection(0x0,(1 << 1)); vAHI_DioSetOutput(0x0, (1 << 1)); //DAC
-        	vAHI_DioSetDirection(0x0,(1 << 18)); vAHI_DioSetOutput(0, (1 << 18)); //SPIMOSI
-        	vAHI_DioSetDirection(0x0,(1 << 19)); vAHI_DioSetOutput(0x0, (1 << 19)); //ADC
-        	vAHI_DioSetDirection(0x0,(1 << 8)); vAHI_DioSetOutput(0, (1 << 8)); //SDN
-
-        	vAHI_SpiDisable();*/
-
-        	ENABLE_3VLN();
+        	DISABLE_WB();
+        	ENABLE_POWERSAVE();
 
             // load payload data into APDU
             uint16 byteCount = PDUM_u16APduInstanceWriteNBO(
@@ -733,6 +727,7 @@ void vRunning()
 							}
 						}
 					}
+                    break;
                 }
                 case '&':
 				{
@@ -785,6 +780,7 @@ void vRunning()
 							}
 						}
 					}
+                    break;
                 }
                 default:
                     DBG_vPrintf(TRACE_APP, "Unrecognized Packet ID: 0x%x\n", idByte);
@@ -861,6 +857,8 @@ void APP_vtaskMyEndPoint (void)
 		ltc1661_init();
 		ad8231_disable();
 		ltc1661_sleep();
+		ENABLE_POWERSAVE();
+		DISABLE_WB();
 
 		// load NV configuration
 	    {
