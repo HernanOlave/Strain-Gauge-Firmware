@@ -241,6 +241,8 @@ void SendData()
         else
         {
         	int sensorValue, temperatureValue, batteryValue;
+        	static int results[10];
+        	int i, j, temp;
 
         	DISABLE_POWERSAVE();
         	ENABLE_WB();
@@ -255,7 +257,31 @@ void SendData()
 
         	// Start ADC Conversion
         	MCP3204_init(0);
-        	sensorValue = MCP3204_convert(0, 2);
+
+        	for (i = 0; i < 10; i++) results[i] = MCP3204_convert(0, 2);
+
+        	for(i = 0; i < 10-1; i++)
+        	{
+        		for(j = 0; j < 10-i-1; j++)
+        		{
+        			if(results[j]>results[j+1])
+        			{
+        				temp = results[j];
+        				results[j] = results[j+1];
+        				results[j+1] = temp;
+        			}
+        		}
+        	}
+
+        	DBG_vPrintf(TRACE_APP, "APP: sorted Values = ");
+        	for (i = 0; i < 10; i++) DBG_vPrintf(TRACE_APP,"%d, ", results[i]);
+        	DBG_vPrintf(TRACE_APP, "\n\r");
+
+        	sensorValue = results[3];
+        	sensorValue += results[4];
+        	sensorValue += results[5];
+        	sensorValue /= 3;
+
         	temperatureValue = MCP3204_convert(0, 1);
         	batteryValue = MCP3204_convert(0, 0);
 
