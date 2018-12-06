@@ -120,6 +120,7 @@ void AuthNetwork()
             sizeof(currentEpid) );
 
 
+    DBG_vPrintf(TRACE_APP, "ED_STATE: E_RUNNING 1\n");
     s_eDeviceState.eNodeState = E_RUNNING;
 
     // successfully connected to a network, clear FLEX flag
@@ -149,6 +150,7 @@ void JoinHandler()
 {
     if( currentEpid == 0 )
     {
+    	DBG_vPrintf(TRACE_APP, "ED_STATE: E_AUTH_REQ\n");
         s_eDeviceState.eNodeState = E_AUTH_REQ;
 
         DBG_vPrintf(
@@ -160,6 +162,7 @@ void JoinHandler()
     {
         // currentEpid previously set signalling a rejoin
 
+    	DBG_vPrintf(TRACE_APP, "ED_STATE: E_RUNNING 2\n");
         s_eDeviceState.eNodeState = E_RUNNING;
 
         // successfully connected to a network, clear FLEX flag
@@ -190,6 +193,7 @@ void LeaveNetwork()
 
 void RestartNetwork()
 {
+	DBG_vPrintf(TRACE_APP, "ED_STATE: E_STARTUP 1\n");
     s_eDeviceState.eNodeState = E_STARTUP;
 }
 
@@ -297,7 +301,8 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
      * All Application records must be loaded before the call to
      * ZPS_eAplAfInit
      */
-    s_eDeviceState.eNodeState = E_STARTUP;
+    //DBG_vPrintf(TRACE_APP, "ED_STATE: E_STARTUP 2\n");
+    //s_eDeviceState.eNodeState = E_STARTUP;
     PDM_eReadDataFromRecord(PDM_ID_APP_SED,
                     		&s_eDeviceState,
                     		sizeof(s_eDeviceState),
@@ -348,8 +353,24 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
     else /* perform any actions require on initial start-up */
     {
         /* Return the device to the start-up state if it was reset during the network formation stage */
+    	DBG_vPrintf(TRACE_APP, "ED_STATE: E_STARTUP 3\n");
         s_eDeviceState.eNodeState = E_STARTUP;
     }
+}
+
+void ResetNetwork()
+{
+    PDM_vDeleteDataRecord( PDM_APP_ID_EPID );
+    currentEpid = 0;
+
+    // clear blacklist
+    for( blacklistIndex = 0; blacklistIndex < BLACKLIST_MAX; blacklistIndex++ )
+    {
+        blacklistEpids[blacklistIndex] = 0;
+    }
+    blacklistIndex = 0;
+
+    ZPS_eAplAibSetApsUseExtendedPanId( 0 );
 }
 
 /****************************************************************************
@@ -368,7 +389,14 @@ PUBLIC void APP_vtaskSleepingEndDevice()
     if( configPressed_sed )
     {
         configPressed_sed = FALSE;
+        ResetNetwork();
+        LeaveNetwork();
         networkFlex = TRUE;
+
+        PDM_vDeleteDataRecord( PDM_ID_APP_SED );
+
+        //DBG_vPrintf(TRACE_APP, "ED_STATE: E_STARTUP 4\n");
+        //s_eDeviceState.eNodeState = E_STARTUP;
     }
 
     ZPS_tsAfEvent sStackEvent;
@@ -467,6 +495,7 @@ PRIVATE void vStartup(void)
 
     if (ZPS_E_SUCCESS == eStatus)
     {
+    	DBG_vPrintf(TRACE_APP, "ED_STATE: E_DISCOVERY\n");
         s_eDeviceState.eNodeState = E_DISCOVERY;
     }
     else
@@ -475,21 +504,6 @@ PRIVATE void vStartup(void)
     }
 
 
-}
-
-void ResetNetwork()
-{
-    PDM_vDeleteDataRecord( PDM_APP_ID_EPID );
-    currentEpid = 0;
-
-    // clear blacklist
-    for( blacklistIndex = 0; blacklistIndex < BLACKLIST_MAX; blacklistIndex++ )
-    {
-        blacklistEpids[blacklistIndex] = 0;
-    }
-    blacklistIndex = 0;
-
-    ZPS_eAplAibSetApsUseExtendedPanId( 0 );
 }
 
 /****************************************************************************
@@ -557,6 +571,7 @@ PRIVATE void vWaitForNetworkDiscovery(ZPS_tsAfEvent sStackEvent)
                 if (ZPS_E_SUCCESS == eStatus)
                 {
                     DBG_vPrintf(TRACE_APP, "DISCOVER: Joining network\n");
+                    DBG_vPrintf(TRACE_APP, "ED_STATE: E_JOINING_NETWORK\n");
                     s_eDeviceState.eNodeState = E_JOINING_NETWORK;
                 }
                 else
@@ -741,6 +756,7 @@ PRIVATE void vHandleStackEvent(ZPS_tsAfEvent sStackEvent)
             case ZPS_EVENT_NWK_LEAVE_CONFIRM:
             {
                 DBG_vPrintf(TRACE_APP, "RUN: ZPS_EVENT_LEAVE_CONFIRM\n");
+                vAHI_SwReset();
             }
             break;
 

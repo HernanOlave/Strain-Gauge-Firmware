@@ -242,7 +242,7 @@ void SendData()
         {
         	int sensorValue, temperatureValue, batteryValue;
         	static int results[10];
-        	int i, j, temp;
+        	int i, j, Imin, temp;
 
         	DISABLE_POWERSAVE();
         	ENABLE_WB();
@@ -262,15 +262,17 @@ void SendData()
 
         	for(i = 0; i < 10-1; i++)
         	{
-        		for(j = 0; j < 10-i-1; j++)
+        		Imin = i;
+        		for(j = i + 1; j < 10; j++)
         		{
-        			if(results[j]>results[j+1])
+        			if(results[j] < results[Imin])
         			{
-        				temp = results[j];
-        				results[j] = results[j+1];
-        				results[j+1] = temp;
+        				Imin = j;
         			}
         		}
+        		temp = results[Imin];
+        		results[Imin] = results[i];
+        		results[i] = temp;
         	}
 
         	DBG_vPrintf(TRACE_APP, "APP: sorted Values = ");
@@ -869,6 +871,7 @@ void APP_vtaskMyEndPoint (void)
         PDM_vDeleteDataRecord( PDM_APP_ID_GAIN );
         configured = FALSE;
 
+        DBG_vPrintf(TRACE_APP, "APP_STATE: EP_STATE_INIT\n");
         endPointState = EP_STATE_INIT;
     }
 
@@ -1122,59 +1125,63 @@ void APP_vtaskMyEndPoint (void)
 			}
 		}
 
-	    // "Broadcast" command
-		DBG_vPrintf(TRACE_APP, "    sending Broadcast command\n");
+	    if( s_eDeviceState.eNodeState == E_RUNNING )
+	    {
+	    	// "Broadcast" command
+			DBG_vPrintf(TRACE_APP, "    sending Broadcast command\n");
 
-		// allocate memory for APDU buffer with preconfigured "type"
-		PDUM_thAPduInstance data = PDUM_hAPduAllocateAPduInstance( apduMyData );
-		if( data == PDUM_INVALID_HANDLE )
-		{
-			// problem allocating APDU instance memory
-			DBG_vPrintf(TRACE_APP, "APP: Unable to allocate APDU memory\n");
-		}
-		else
-		{
-			// load payload data into APDU
-			uint16 byteCount = PDUM_u16APduInstanceWriteNBO(
-							   data,	// APDU instance handle
-							   0,		// APDU position for data
-							   "b",	// data format string
-							   '&');
-
-			if( byteCount == 0 )
+			// allocate memory for APDU buffer with preconfigured "type"
+			PDUM_thAPduInstance data = PDUM_hAPduAllocateAPduInstance( apduMyData );
+			if( data == PDUM_INVALID_HANDLE )
 			{
-				// no data was written to the APDU instance
-				DBG_vPrintf(TRACE_APP, "APP: No data written to APDU\n");
+				// problem allocating APDU instance memory
+				DBG_vPrintf(TRACE_APP, "APP: Unable to allocate APDU memory\n");
 			}
 			else
 			{
-				PDUM_eAPduInstanceSetPayloadSize( data, byteCount );
-				DBG_vPrintf(TRACE_APP, "APP: Data written to APDU: %d\n", byteCount);
+				// load payload data into APDU
+				uint16 byteCount = PDUM_u16APduInstanceWriteNBO(
+								   data,	// APDU instance handle
+								   0,		// APDU position for data
+								   "b",	// data format string
+								   '&');
 
-				// request data send to destination
-				PDM_teStatus status = ZPS_eAplAfUnicastDataReq(
-						 data,					// APDU instance handle
-						 0xFFFF,					// cluster ID
-						 1,						// source endpoint
-						 1,						// destination endpoint
-						 0x0000,					// destination network address
-						 ZPS_E_APL_AF_UNSECURE,	// security mode
-						 0,						// radius
-						 NULL);					// sequence number pointer
-
-				if( status != ZPS_E_SUCCESS )
+				if( byteCount == 0 )
 				{
-					// problem with request
-					DBG_vPrintf(TRACE_APP, "APP: AckDataReq not successful. Return: 0x%x\n", status);
-					DBG_vPrintf(TRACE_APP, "ERROR: EPID: 0x%016llx\n", ZPS_u64AplZdoGetNetworkExtendedPanId());
-					DBG_vPrintf(TRACE_APP, "ERROR: Node State:  %d\n",s_eDeviceState.eNodeState);
+					// no data was written to the APDU instance
+					DBG_vPrintf(TRACE_APP, "APP: No data written to APDU\n");
+				}
+				else
+				{
+					PDUM_eAPduInstanceSetPayloadSize( data, byteCount );
+					DBG_vPrintf(TRACE_APP, "APP: Data written to APDU: %d\n", byteCount);
+
+					// request data send to destination
+					PDM_teStatus status = ZPS_eAplAfUnicastDataReq(
+							 data,					// APDU instance handle
+							 0xFFFF,					// cluster ID
+							 1,						// source endpoint
+							 1,						// destination endpoint
+							 0x0000,					// destination network address
+							 ZPS_E_APL_AF_UNSECURE,	// security mode
+							 0,						// radius
+							 NULL);					// sequence number pointer
+
+					if( status != ZPS_E_SUCCESS )
+					{
+						// problem with request
+						DBG_vPrintf(TRACE_APP, "APP: AckDataReq not successful. Return: 0x%x\n", status);
+						DBG_vPrintf(TRACE_APP, "ERROR: EPID: 0x%016llx\n", ZPS_u64AplZdoGetNetworkExtendedPanId());
+						DBG_vPrintf(TRACE_APP, "ERROR: Node State:  %d\n",s_eDeviceState.eNodeState);
+					}
 				}
 			}
-		}
+	    }
 
 	    // Initialize External ADC Here (if needed)
 	    // ADC_INIT
 
+		DBG_vPrintf(TRACE_APP, "APP_STATE: EP_STATE_WAIT_NETWORK\n");
 		endPointState = EP_STATE_WAIT_NETWORK;
 		break;
 	}
@@ -1184,6 +1191,7 @@ void APP_vtaskMyEndPoint (void)
 		{
 		    // initialize AUTH CODE state
 
+			DBG_vPrintf(TRACE_APP, "APP_STATE: EP_STATE_AUTH\n");
 			endPointState = EP_STATE_AUTH;
 
 			SendAuthReq();
@@ -1197,6 +1205,7 @@ void APP_vtaskMyEndPoint (void)
 		}
 		else if( s_eDeviceState.eNodeState == E_RUNNING )
         {
+			DBG_vPrintf(TRACE_APP, "APP_STATE: EP_STATE_CONFIG 1\n");
             endPointState = EP_STATE_CONFIG;
         }
 		else if( wakeup )
@@ -1212,11 +1221,13 @@ void APP_vtaskMyEndPoint (void)
 	{
 	    if( (s_eDeviceState.eNodeState != E_RUNNING) && (s_eDeviceState.eNodeState != E_AUTH_REQ) )
         {
+	    	DBG_vPrintf(TRACE_APP, "APP_STATE: EP_STATE_WAIT_NETWORK\n");
             endPointState = EP_STATE_WAIT_NETWORK;
             break;
         }
 	    else if( s_eDeviceState.eNodeState == E_RUNNING )
         {
+	    	DBG_vPrintf(TRACE_APP, "APP_STATE: EP_STATE_CONFIG 2\n");
             endPointState = EP_STATE_CONFIG;
         }
 	    else
@@ -1229,10 +1240,12 @@ void APP_vtaskMyEndPoint (void)
 	case EP_STATE_CONFIG:
         if( s_eDeviceState.eNodeState != E_RUNNING )
         {
+        	DBG_vPrintf(TRACE_APP, "APP_STATE: EP_STATE_WAIT_NETWORK\n");
             endPointState = EP_STATE_WAIT_NETWORK;
         }
         else if( configured )
 		{
+        	DBG_vPrintf(TRACE_APP, "APP_STATE: EP_STATE_RUNNING\n");
 			endPointState = EP_STATE_RUNNING;
 		}
         else if( wakeup )
@@ -1253,6 +1266,7 @@ void APP_vtaskMyEndPoint (void)
 	{
 	    if( s_eDeviceState.eNodeState != E_RUNNING )
 		{
+	    	DBG_vPrintf(TRACE_APP, "APP_STATE: EP_STATE_WAIT_NETWORK\n");
 			endPointState = EP_STATE_WAIT_NETWORK;
 		}
 	    else if( wakeup )

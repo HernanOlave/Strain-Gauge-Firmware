@@ -284,7 +284,7 @@ PWRM_CALLBACK(Wakeup)
     {
     	DBG_vPrintf(TRACE_APP, "APP: Config button pressed\n");
         configPressed_sed = TRUE;
-        configPressed_ep  = TRUE;
+		configPressed_ep  = TRUE;
     }
 
     /* Restore Mac settings (turns radio on) */
