@@ -387,7 +387,7 @@ PRIVATE void vHandleStackEvent(ZPS_tsAfEvent sStackEvent)
             {
             	DBG_vPrintf(TRACE_APP, "APP: vCheckStackEvent: ZPS_EVENT_NWK_STATUS_INDICATION\n");
                 DBG_vPrintf(TRACE_APP, "    Address: 0x%x\n", sStackEvent.uEvent.sNwkStatusIndicationEvent.u16NwkAddr);
-                DBG_vPrintf(TRACE_APP, "    Status : 0x%x\n", sStackEvent.uEvent.sNwkStatusIndicationEvent.u8Status);
+                DBG_vPrintf(TRACE_APP, "    Status : %d\n", sStackEvent.uEvent.sNwkStatusIndicationEvent.u8Status);
             }
             break;
 

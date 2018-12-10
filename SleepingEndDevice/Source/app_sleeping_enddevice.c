@@ -389,6 +389,7 @@ PUBLIC void APP_vtaskSleepingEndDevice()
     if( configPressed_sed )
     {
         configPressed_sed = FALSE;
+
         ResetNetwork();
         LeaveNetwork();
         networkFlex = TRUE;
@@ -578,6 +579,7 @@ PRIVATE void vWaitForNetworkDiscovery(ZPS_tsAfEvent sStackEvent)
                 {
                     /* start scan again */
                     DBG_vPrintf(TRACE_APP, "DISCOVER: Failed to request network join : 0x%02x\n", eStatus);
+                    DBG_vPrintf(TRACE_APP, "DISCOVER: Failed to request network join : 0x%02x\n", sStackEvent.uEvent.sNwkJoinFailedEvent.u8Status);
                     RestartNetwork();
                 }
 
@@ -803,6 +805,7 @@ PRIVATE void vHandleStackEvent(ZPS_tsAfEvent sStackEvent)
 
             case ZPS_EVENT_NWK_FAILED_TO_JOIN:
             {
+            	DBG_vPrintf(TRACE_APP, "RUN: ZPS_EVENT_NWK_FAILED_TO_JOIN\n");
                 RestartNetwork();
             }
             break;
