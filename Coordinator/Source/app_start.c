@@ -160,7 +160,7 @@ PUBLIC void vAppMain(void)
     {
         DBG_vPrintf(TRACE_APP, "APP: Watchdog timer has reset device!\n");
         vAHI_WatchdogStop();
-        while (1);  // TODO
+        vAHI_SwReset();
     }
 
     /* Define HIGH_POWER_ENABLE to enable high power module */

@@ -762,6 +762,11 @@ void vRunning()
 					// "Broadcast" command
 					DBG_vPrintf(TRACE_APP, "    Broadcast command received\n");
 
+					PDM_vDeleteDataRecord( PDM_APP_ID_CONFIGURED );
+					configured = FALSE;
+					DBG_vPrintf(TRACE_APP, "APP_STATE: EP_STATE_INIT\n");
+					endPointState = EP_STATE_INIT;
+
 					// allocate memory for APDU buffer with preconfigured "type"
 					PDUM_thAPduInstance data = PDUM_hAPduAllocateAPduInstance( apduMyData );
 					if( data == PDUM_INVALID_HANDLE )

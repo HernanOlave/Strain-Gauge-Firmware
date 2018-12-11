@@ -157,7 +157,7 @@ PUBLIC void vAppMain(void)
     {
         DBG_vPrintf(TRACE_APP, "APP: Watchdog timer has reset device!\n");
         vAHI_WatchdogStop();
-        while (1);  // TODO
+        vAHI_SwReset();
     }
 
     /* Initialize ROM based software modules */
