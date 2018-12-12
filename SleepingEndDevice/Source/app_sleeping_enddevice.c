@@ -201,7 +201,8 @@ void RestartNetwork()
 PUBLIC void vWakeCallBack(void)
 {
 	networkWakeup = TRUE;
-
+	if (s_eDeviceState.eNodeState != E_RUNNING)
+		RestartNetwork();
     AppWakeRoutine();
 }
 
@@ -301,8 +302,6 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
      * All Application records must be loaded before the call to
      * ZPS_eAplAfInit
      */
-    //DBG_vPrintf(TRACE_APP, "ED_STATE: E_STARTUP 2\n");
-    //s_eDeviceState.eNodeState = E_STARTUP;
     PDM_eReadDataFromRecord(PDM_ID_APP_SED,
                     		&s_eDeviceState,
                     		sizeof(s_eDeviceState),
@@ -389,15 +388,7 @@ PUBLIC void APP_vtaskSleepingEndDevice()
     if( configPressed_sed )
     {
         configPressed_sed = FALSE;
-
-        ResetNetwork();
-        LeaveNetwork();
         networkFlex = TRUE;
-
-        PDM_vDeleteDataRecord( PDM_ID_APP_SED );
-
-        //DBG_vPrintf(TRACE_APP, "ED_STATE: E_STARTUP 4\n");
-        //s_eDeviceState.eNodeState = E_STARTUP;
     }
 
     ZPS_tsAfEvent sStackEvent;
@@ -758,7 +749,6 @@ PRIVATE void vHandleStackEvent(ZPS_tsAfEvent sStackEvent)
             case ZPS_EVENT_NWK_LEAVE_CONFIRM:
             {
                 DBG_vPrintf(TRACE_APP, "RUN: ZPS_EVENT_LEAVE_CONFIRM\n");
-                vAHI_SwReset();
             }
             break;
 
