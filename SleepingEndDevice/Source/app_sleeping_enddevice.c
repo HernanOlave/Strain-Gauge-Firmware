@@ -458,6 +458,8 @@ PRIVATE void vStartup(void)
      *      - when connection to a network is lost (after X unsuccessful communications)
      */
 
+	ZPS_vNwkNibSetLeaveAllowed( ZPS_pvAplZdoGetNwkHandle(), FALSE);
+
     /* Start the network stack as a end device */
     DBG_vPrintf(TRACE_APP, "STARTUP: Starting ZPS\n");
 
@@ -493,6 +495,7 @@ PRIVATE void vStartup(void)
     else
     {
         DBG_vPrintf(TRACE_APP, "STARTUP: Failed to Start Stack. Status: 0x%02x\n", eStatus);
+        if (eStatus == 0x8b) vAHI_SwReset();
     }
 
 
