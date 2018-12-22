@@ -32,6 +32,7 @@
  * Copyright NXP B.V. 2015. All rights reserved
  *
  ****************************************************************************/
+
 #ifndef APP_SLEEPING_ENDDEVICE_H_
 #define APP_SLEEPING_ENDDEVICE_H_
 
@@ -39,17 +40,68 @@
 /***        Macro Definitions                                             ***/
 /****************************************************************************/
 
-#define BLACKLIST_MAX   32      // max number of blacklist EPIDs
+#define BLACKLIST_MAX   			32		// max number of blacklist EPIDs
+#define CHANNEL_A_DEFAULT_VALUE		2048	// DAC's channel A
+#define CHANNEL_B_DEFAULT_VALUE		2048	// DAC's channel B
+#define GAIN_DEFAULT_VALUE			32		// INAMP Gain
 
 /****************************************************************************/
 /***        Type Definitions                                              ***/
 /****************************************************************************/
 
+typedef enum
+{
+	NWK_STARTUP_STATE,
+    NWK_DISC_STATE,
+    NWK_JOIN_STATE,
+    NWK_AUTH_STATE,
+    NWK_LEAVE_STATE,
+    NWK_REJOIN_STATE
+} networkStates_t;
+
+typedef enum
+{
+    NETWORK_STATE,
+    POLL_DATA_STATE,
+    HANDLE_DATA_STATE,
+    READ_SENSOR_STATE,
+    SEND_DATA_STATE,
+    PREP_TO_SLEEP_STATE,
+    SLEEP_STATE,
+    WAKE_UP_STATE
+} sleepingEndDeviceStates_t;
+
+typedef struct
+{
+	uint16						currentEpid;
+	bool						isConfigured;
+	bool						isConnected;
+	uint16						channelAValue;
+	uint16						channelBValue;
+	uint16						gainValue;
+	uint16						sensorValue;
+	uint16						temperatureValue;
+	uint16						batteryLevel;
+	sleepingEndDeviceStates_t   currentState;
+	sleepingEndDeviceStates_t   previousState;
+} seDeviceDesc_t;
+
+enum {
+    PDM_APP_ID_SAMPLE_PERIOD = 0x100,   // configured sample period value
+    PDM_APP_ID_CONFIGURED,              // flag indicating configuration is finished and device is active
+    PDM_APP_ID_EPID,                    // EPID of current/last authorized network
+    PDM_APP_ID_BLACKLIST,               // list of incompatible network EPIDs
+    PDM_APP_ID_CHANNEL_A,				// configured value for DAC's channel A
+    PDM_APP_ID_CHANNEL_B,				// configured value for DAC's channel B
+    PDM_APP_ID_GAIN,					// configured value for INAMP's Gain
+};
 /****************************************************************************/
 /***        Exported Functions                                            ***/
 /****************************************************************************/
+
 PUBLIC void APP_vInitialiseSleepingEndDevice(void);
-PUBLIC void APP_vtaskSleepingEndDevice (void);
+PUBLIC void APP_vtaskSleepingEndDevice(void);
+
 /****************************************************************************/
 /***        External Variables                                            ***/
 /****************************************************************************/
