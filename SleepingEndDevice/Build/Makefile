@@ -150,7 +150,6 @@ APPSRC += zps_gen.c
 APPSRC += app_start_SED.c
 APPSRC += app_sleeping_enddevice.c
 APPSRC += app_syscon.c
-APPSRC += app_endpoint.c
 APPSRC += appZdpExtraction.c
 APPSRC += appZpsBeaconHandler.c
 APPSRC += app_pdm.c

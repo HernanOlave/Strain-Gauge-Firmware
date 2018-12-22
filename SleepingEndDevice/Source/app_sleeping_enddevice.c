@@ -83,6 +83,9 @@ PUBLIC uint8 au8DefaultTCLinkKey[16] = "ZigBeeAlliance09";
 PRIVATE seDeviceDesc_t s_eDevice;
 PRIVATE networkStates_t networkState;
 
+tszQueue APP_msgStrainGaugeEvents;
+tszQueue APP_msgZpsEvents;
+
 /****************************************************************************/
 /***        Exported Functions                                            ***/
 /****************************************************************************/
@@ -101,6 +104,8 @@ PRIVATE networkStates_t networkState;
  ****************************************************************************/
 PUBLIC void APP_vInitialiseSleepingEndDevice(void)
 {
+	DBG_vPrintf(TRACE_APP, "APP: Startup\n\r");
+
     bool_t bDeleteRecords = FALSE;
 
     /* Delete the network context from flash if a button is being held down
@@ -171,11 +176,11 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
 		);
     }
 
-    DBG_vPrintf(TRACE_APP, "APP: EPID: %d", s_eDevice.currentEpid);
-    DBG_vPrintf(TRACE_APP, "APP: CONFIGURED: %d", s_eDevice.isConfigured);
-    DBG_vPrintf(TRACE_APP, "APP: CHANNEL_A: %d", s_eDevice.channelAValue);
-    DBG_vPrintf(TRACE_APP, "APP: CHANNEL_B: %d", s_eDevice.channelBValue);
-    DBG_vPrintf(TRACE_APP, "APP: GAIN: %d", s_eDevice.gainValue);
+    DBG_vPrintf(TRACE_APP, "APP: EPID: %d\n\r", s_eDevice.currentEpid);
+    DBG_vPrintf(TRACE_APP, "APP: CONFIGURED: %d\n\r", s_eDevice.isConfigured);
+    DBG_vPrintf(TRACE_APP, "APP: CHANNEL_A: %d\n\r", s_eDevice.channelAValue);
+    DBG_vPrintf(TRACE_APP, "APP: CHANNEL_B: %d\n\r", s_eDevice.channelBValue);
+    DBG_vPrintf(TRACE_APP, "APP: GAIN: %d\n\r", s_eDevice.gainValue);
 
     /* Initialize ZBPro stack */
     ZPS_eAplAfInit();
@@ -198,6 +203,7 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
      */
 
     /* Always start on NETWORK STATE */
+    DBG_vPrintf(TRACE_APP, "\n\rAPP: NETWORK_STATE\n\r");
     s_eDevice.currentState = NETWORK_STATE;
 
     /* Always start on NETWORK STARTUP STATE */
@@ -231,14 +237,14 @@ PUBLIC void APP_vtaskSleepingEndDevice()
 
         	if(s_eDevice.isConnected)
         	{
-        		DBG_vPrintf(TRACE_APP, "APP: Device is connected\r\n");
+        		DBG_vPrintf(TRACE_APP, "APP: Device is connected\n\r");
         		s_eDevice.currentState = POLL_DATA_STATE;
         	}
-        	else
+        	/*else
         	{
-        		DBG_vPrintf(TRACE_APP, "APP: Device is NOT connected\r\n");
+        		DBG_vPrintf(TRACE_APP, "APP: Device is NOT connected\n\r");
         		s_eDevice.currentState = PREP_TO_SLEEP_STATE;
-        	}
+        	}*/
         }
         break;
 
@@ -284,8 +290,8 @@ PUBLIC void APP_vtaskSleepingEndDevice()
             DBG_vPrintf
             (
             	TRACE_APP,
-            	"APP: Unhandled State : %d\n",
-            	s_eDeviceState.eNodeState
+            	"APP: Unhandled State : %d\n\r",
+            	s_eDevice.currentState
             );
         }
         break;
@@ -309,20 +315,22 @@ PUBLIC void APP_vtaskSleepingEndDevice()
  ****************************************************************************/
 PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 {
+	ZPS_teStatus eStatus;
+
 	switch(networkState)
 	{
 		case NWK_STARTUP_STATE:
 		{
 		    /* Start the network stack as a end device */
-		    DBG_vPrintf(TRACE_APP, "NWK: Starting ZPS\n");
-		    ZPS_teStatus eStatus = ZPS_eAplZdoStartStack();
+		    DBG_vPrintf(TRACE_APP, "\n\rNWK: Starting ZPS\n\r");
+		    eStatus = ZPS_eAplZdoStartStack();
 
 		    if (ZPS_E_SUCCESS != eStatus)
 		    {
 		    	DBG_vPrintf
 		    	(
 		    		TRACE_APP,
-		    		"NWK: Failed to Start Stack. Status: 0x%02x\n",
+		    		"NWK: Failed to Start Stack. Status: %d\n\r",
 		    		eStatus
 		    	);
 		    	//TODO: Handle errors
@@ -346,13 +354,139 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 
 		case NWK_DISC_STATE:
 	    {
+	    	/* If there is no event breaks */
+	    	if(sStackEvent.eType == ZPS_EVENT_NONE) break;
+
+	    	/* Discovery process complete */
+	    	else if(sStackEvent.eType == ZPS_EVENT_NWK_DISCOVERY_COMPLETE)
+	    	{
+	    		DBG_vPrintf
+	    		(
+	    			TRACE_APP,
+	    			"NWK: Network discovery complete\n\r"
+	    		);
+
+	    		/* If there is any error in the discovery process stops */
+	    		if(sStackEvent.uEvent.sNwkDiscoveryEvent.eStatus != MAC_ENUM_SUCCESS)
+	    		{
+	    			DBG_vPrintf
+	    			(
+	    				TRACE_APP,
+	    				"NWK: Network discovery failed with error %d\n\r",
+	    				sStackEvent.uEvent.sNwkDiscoveryEvent.eStatus
+	    			);
+	    			//TODO: Handle error
+	    		}
+	    		else /* Discovery process successful */
+	    		{
+	    			/* If no network is found stops */
+	    			if(sStackEvent.uEvent.sNwkDiscoveryEvent.u8NetworkCount == 0)
+	    			{
+	    				DBG_vPrintf
+	    				(
+	    					TRACE_APP,
+	    					"NWK: No network found\n\r"
+	    				);
+	    			}
+	    			else /* Networks found */
+	    			{
+	    				DBG_vPrintf
+						(
+							TRACE_APP,
+							"NWK: Found %d networks\n\r",
+							sStackEvent.uEvent.sNwkDiscoveryEvent.u8NetworkCount
+						);
+
+	    				/* Get index of recommended network to join */
+						uint8 networkIndex = sStackEvent.uEvent.sNwkDiscoveryEvent.u8SelectedNetwork;
+
+						/* Create network descriptor */
+						ZPS_tsNwkNetworkDescr *psNwkDescr = &sStackEvent.uEvent.sNwkDiscoveryEvent.psNwkDescriptors[networkIndex];
+
+						/* Join request */
+						eStatus = ZPS_eAplZdoJoinNetwork(psNwkDescr);
+						if (eStatus == ZPS_E_SUCCESS)
+						{
+							DBG_vPrintf(TRACE_APP, "NWK: Joining network\n\r");
+							DBG_vPrintf(TRACE_APP, "NWK: Ext PAN ID = 0x%016llx\n", psNwkDescr->u64ExtPanId);
+							networkState = NWK_JOIN_STATE;
+						}
+						else
+						{
+							DBG_vPrintf
+							(
+								TRACE_APP,
+								"NWK: Failed to request network join : %d\n\r",
+								eStatus
+							);
+							//TODO: Handle ERROR
+						}
+	    			}
+	    		}
+
+	    	}
+	    	else if(sStackEvent.eType == ZPS_EVENT_NWK_FAILED_TO_JOIN)
+			{
+
+			}
+	    	else if(sStackEvent.eType == ZPS_EVENT_NWK_JOINED_AS_ENDDEVICE)
+			{
+
+			}
+	    	else
+	    	{
+	    		DBG_vPrintf
+	    		(
+	    			TRACE_APP,
+	    			"NWK: Discovery unexpected event - %d\n\r",
+	    			sStackEvent.eType
+	    		);
+	    		//TODO: Handle error
+	    	}
 
 	    }
 	    break;
 
 		case NWK_JOIN_STATE:
 		{
+			/* If there is no event breaks */
+			if(sStackEvent.eType == ZPS_EVENT_NONE) break;
 
+			/* Node joined as end device */
+			else if(sStackEvent.eType == ZPS_EVENT_NWK_JOINED_AS_ENDDEVICE)
+			{
+				DBG_vPrintf
+				(
+					TRACE_APP,
+					"NWK: Node joined network with Address 0x%04x\n",
+				    sStackEvent.uEvent.sNwkJoinedEvent.u16Addr
+				);
+
+				//TODO: Save network info
+				//TODO: Request AUTH and go to AUTH State
+			}
+
+			/* Node failed to join */
+			else if(sStackEvent.eType == ZPS_EVENT_NWK_FAILED_TO_JOIN)
+			{
+				DBG_vPrintf
+				(
+					TRACE_APP,
+					"NWK: Node failed to join network. Status: %d\n\r",
+					sStackEvent.uEvent.sNwkJoinFailedEvent.u8Status
+				);
+				//TODO: Handle error
+			}
+			else /* Unexpected event */
+			{
+				DBG_vPrintf
+				(
+					TRACE_APP,
+					"NWK: Join unexpected event - %d\n\r",
+					sStackEvent.eType
+				);
+				//TODO: Handle error
+			}
 		}
 		break;
 
@@ -386,6 +520,32 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 		}
 		break;
 	}
+}
+
+/****************************************************************************/
+/***        Local Functions                                               ***/
+/****************************************************************************/
+/****************************************************************************
+ *
+ * NAME: APP_vGenCallback
+ *
+ * DESCRIPTION:
+ * Stack callback
+ *
+ * RETURNS:
+ * void
+ *
+ ****************************************************************************/
+PUBLIC void APP_vGenCallback(uint8 u8Endpoint, ZPS_tsAfEvent *psStackEvent)
+{
+    if ( u8Endpoint == 0 )
+    {
+    	ZQ_bQueueSend(&APP_msgZpsEvents, (void*) psStackEvent);
+    }
+    else
+    {
+    	ZQ_bQueueSend(&APP_msgStrainGaugeEvents, (void*) psStackEvent);
+    }
 }
 
 /****************************************************************************/

@@ -310,10 +310,8 @@ PWRM_CALLBACK(Wakeup)
  ****************************************************************************/
 PRIVATE void vfExtendedStatusCallBack (ZPS_teExtendedStatus eExtendedStatus)
 {
-    extern tsDeviceDesc s_eDeviceState;
 	DBG_vPrintf(TRACE_APP, "ERROR: Extended status 0x%x\n", eExtendedStatus);
     DBG_vPrintf(TRACE_APP, "ERROR: EPID: 0x%016llx\n", ZPS_u64AplZdoGetNetworkExtendedPanId());
-    DBG_vPrintf(TRACE_APP, "ERROR: Node State:  %d\n",s_eDeviceState.eNodeState);
 }
 
 
@@ -388,7 +386,6 @@ PUBLIC void app_vMainloop(void)
 
         zps_taskZPS();
         APP_vtaskSleepingEndDevice();
-        APP_vtaskMyEndPoint();
         ZTIMER_vTask();
         /* kick the watchdog timer */
         vAHI_WatchdogRestart();
