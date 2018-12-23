@@ -61,6 +61,9 @@
 	#define TRACE_APP 	TRUE
 #endif
 
+#define NO_NETWORK_SLEEP_DUR        10   // seconds
+#define SECS_TO_TICKS( seconds )	seconds * 32768
+
 /****************************************************************************/
 /***        Type Definitions                                              ***/
 /****************************************************************************/
@@ -76,6 +79,8 @@ PUBLIC uint8 au8DefaultTCLinkKey[16] = "ZigBeeAlliance09";
 /***        Exported Variables                                            ***/
 /****************************************************************************/
 
+PUBLIC pwrm_tsWakeTimerEvent sWake;
+
 /****************************************************************************/
 /***        Local Variables                                               ***/
 /****************************************************************************/
@@ -90,6 +95,10 @@ tszQueue APP_msgZpsEvents;
 /***        Exported Functions                                            ***/
 /****************************************************************************/
 
+PUBLIC void AppWakeRoutine(void)
+{
+	DBG_vPrintf(TRACE_APP, "APP: Wakeup routine\n\r");
+}
 
 /****************************************************************************
  *
@@ -114,7 +123,7 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
     //TODO: Implement this feature
     if (bDeleteRecords)
     {
-        DBG_vPrintf(TRACE_APP, "APP: Deleting all records from flash\n");
+        DBG_vPrintf(TRACE_APP, "APP: Deleting all records from flash\n\r");
         PDM_vDeleteAllDataRecords();
     }
 
@@ -473,6 +482,8 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 
 				//TODO: Save network epid
 				//TODO: Request AUTH and go to AUTH State
+
+				networkState = NWK_AUTH_STATE;
 			}
 
 			/* Node failed to join */
@@ -501,7 +512,9 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 
 		case NWK_AUTH_STATE:
 		{
-
+			DBG_vPrintf(TRACE_APP,"  NWK: AUTH State\n\r");
+			DBG_vPrintf(TRACE_APP,"  NWK: Schedule activity in %d seconds\n\r", NO_NETWORK_SLEEP_DUR);
+			PWRM_eScheduleActivity(&sWake, SECS_TO_TICKS(NO_NETWORK_SLEEP_DUR), AppWakeRoutine);
 		}
 		break;
 
