@@ -380,7 +380,6 @@ PUBLIC void app_vMainloop(void)
         if( wakeup )
         {
             wakeup = FALSE;
-            DBG_vPrintf(TRACE_APP, "\n\nAPP: Woken up\n");
             vAppApiSetHighPowerMode( APP_API_MODULE_HPM06, TRUE );
         }
 

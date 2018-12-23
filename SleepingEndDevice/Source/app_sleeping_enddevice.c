@@ -68,6 +68,15 @@
 /***        Type Definitions                                              ***/
 /****************************************************************************/
 
+typedef struct
+{
+	networkStates_t		currentState;
+	uint64				currentEpid;
+	bool				isConnected;
+	uint8				ackStrikes;
+	uint8				noNwkStrikes;
+} networkDesc_t;
+
 /****************************************************************************/
 /***        Local Function Prototypes                                     ***/
 /****************************************************************************/
@@ -86,7 +95,7 @@ PUBLIC pwrm_tsWakeTimerEvent sWake;
 /****************************************************************************/
 
 PRIVATE seDeviceDesc_t s_eDevice;
-PRIVATE networkStates_t networkState;
+PRIVATE networkDesc_t s_network;
 
 tszQueue APP_msgStrainGaugeEvents;
 tszQueue APP_msgZpsEvents;
@@ -95,9 +104,11 @@ tszQueue APP_msgZpsEvents;
 /***        Exported Functions                                            ***/
 /****************************************************************************/
 
-PUBLIC void AppWakeRoutine(void)
+PUBLIC void vWakeCallBack(void)
 {
-	DBG_vPrintf(TRACE_APP, "APP: Wakeup routine\n\r");
+	DBG_vPrintf(TRACE_APP, "\n\r*** WAKE UP ROUTINE ***\n\r");
+	DBG_vPrintf(TRACE_APP, "APP: WAKE_UP_STATE\n\r");
+	s_eDevice.currentState = WAKE_UP_STATE;
 }
 
 /****************************************************************************
@@ -128,12 +139,16 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
     }
 
     /* Load default values on startup */
-    s_eDevice.currentEpid = 0;
+    s_network.currentEpid = 0;
+    s_network.isConnected = FALSE;
+    s_network.ackStrikes = 0;
+    s_network.noNwkStrikes = 0;
+
     s_eDevice.isConfigured = FALSE;
-    s_eDevice.isConnected = FALSE;
     s_eDevice.channelAValue = CHANNEL_A_DEFAULT_VALUE;
     s_eDevice.channelBValue = CHANNEL_B_DEFAULT_VALUE;
     s_eDevice.gainValue = GAIN_DEFAULT_VALUE;
+    s_eDevice.sleepTime = DEFAULT_SLEEP_TIME;
 
     /* Restore any application data previously saved to flash
      * All Application records must be loaded before the call to
@@ -146,8 +161,8 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
     PDM_eReadDataFromRecord
     (
     	PDM_APP_ID_EPID,
-        &s_eDevice.currentEpid,
-        sizeof(s_eDevice.currentEpid),
+        &s_network.currentEpid,
+        sizeof(s_network.currentEpid),
         &u16DataBytesRead
     );
 
@@ -185,12 +200,6 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
 		);
     }
 
-    DBG_vPrintf(TRACE_APP, "APP: EPID: 0x%016llx\n\r", s_eDevice.currentEpid);
-    DBG_vPrintf(TRACE_APP, "APP: CONFIGURED: %d\n\r", s_eDevice.isConfigured);
-    DBG_vPrintf(TRACE_APP, "APP: CHANNEL_A: %d\n\r", s_eDevice.channelAValue);
-    DBG_vPrintf(TRACE_APP, "APP: CHANNEL_B: %d\n\r", s_eDevice.channelBValue);
-    DBG_vPrintf(TRACE_APP, "APP: GAIN: %d\n\r", s_eDevice.gainValue);
-
     /* Initialize ZBPro stack */
     ZPS_eAplAfInit();
 
@@ -202,6 +211,14 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
         0x00,
         ZPS_APS_GLOBAL_LINK_KEY
     );
+
+    DBG_vPrintf(TRACE_APP, "APP: Device Information:\n\r");
+    DBG_vPrintf(TRACE_APP, "  MAC: 0x%016llx\n\r", ZPS_u64AplZdoGetIeeeAddr());
+    DBG_vPrintf(TRACE_APP, "  EPID: 0x%016llx\n\r", s_network.currentEpid);
+    DBG_vPrintf(TRACE_APP, "  Configured Flag: %d\n\r", s_eDevice.isConfigured);
+    DBG_vPrintf(TRACE_APP, "  Channel A: %d\n\r", s_eDevice.channelAValue);
+    DBG_vPrintf(TRACE_APP, "  Channel B: %d\n\r", s_eDevice.channelBValue);
+    DBG_vPrintf(TRACE_APP, "  Gain: %d\n\r", s_eDevice.gainValue);
 
     /* Initialize other software modules
      * HERE
@@ -216,7 +233,8 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
     s_eDevice.currentState = NETWORK_STATE;
 
     /* Always start on NETWORK STARTUP STATE */
-    networkState = NWK_STARTUP_STATE;
+    DBG_vPrintf(TRACE_APP, "  NWK: NWK_STARTUP_STATE\n\r");
+    s_network.currentState = NWK_STARTUP_STATE;
 }
 
 /****************************************************************************
@@ -244,28 +262,170 @@ PUBLIC void APP_vtaskSleepingEndDevice()
         {
         	vHandleNetwork(sStackEvent);
 
-        	if(s_eDevice.isConnected)
+        	if(s_network.isConnected)
         	{
         		DBG_vPrintf(TRACE_APP, "APP: Device is connected\n\r");
+
+        		/* Poll data from Stack */
+        		ZPS_eAplZdoPoll();
+
+        		DBG_vPrintf(TRACE_APP, "\n\rAPP: POLL_DATA_STATE\n\r");
         		s_eDevice.currentState = POLL_DATA_STATE;
         	}
-        	/*else
-        	{
-        		DBG_vPrintf(TRACE_APP, "APP: Device is NOT connected\n\r");
-        		s_eDevice.currentState = PREP_TO_SLEEP_STATE;
-        	}*/
         }
         break;
 
         case POLL_DATA_STATE:
         {
+        	/* If there is no event breaks */
+        	if(sStackEvent.eType == ZPS_EVENT_NONE) break;
+
+        	/* Poll request completed */
+        	else if(sStackEvent.eType == ZPS_EVENT_NWK_POLL_CONFIRM)
+			{
+        		uint8 eStatus;
+        		eStatus = sStackEvent.uEvent.sNwkPollConfirmEvent.u8Status;
+
+				DBG_vPrintf
+				(
+					TRACE_APP,
+					"  NWK: ZPS_EVENT_NEW_POLL_COMPLETE, status = %d\n\r",
+					eStatus
+				);
+
+				/* No new data */
+				if(eStatus == MAC_ENUM_NO_DATA)
+				{
+					DBG_vPrintf(TRACE_APP,"  NWK: No new Data\n\r");
+					s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+				}
+				/* New Data */
+				else if(eStatus == MAC_ENUM_SUCCESS)
+				{
+					DBG_vPrintf(TRACE_APP,"  NWK: New Data\n\r");
+
+					DBG_vPrintf(TRACE_APP, "\n\rAPP: HANDLE_DATA_STATE\n\r");
+					s_eDevice.currentState = HANDLE_DATA_STATE;
+				}
+				else if(eStatus == MAC_ENUM_NO_ACK) /* No acknowledge */
+				{
+					/* add 1 strike */
+					s_network.noNwkStrikes++;
+					DBG_vPrintf
+					(
+						TRACE_APP,
+						"  NWK: No Acknowledge received, strike = %d\n\r",
+						s_network.noNwkStrikes
+					);
+
+					/* if 3 strikes node loses connection */
+					if(s_network.noNwkStrikes >= 3)
+					{
+						s_network.noNwkStrikes = 0;
+						s_network.isConnected = FALSE;
+						DBG_vPrintf(TRACE_APP,"  NWK: Connection lost\n\r");
+					}
+
+					s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+				}
+				else /* unexpected status */
+				{
+					DBG_vPrintf
+					(
+						TRACE_APP,
+						"  NWK: Unexpected poll complete, status = %d\n\r",
+						eStatus
+					);
+					s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+					//TODO: Hanlde error
+				}
+			}
+        	else /* unexpected event */
+        	{
+        		DBG_vPrintf
+				(
+					TRACE_APP,
+					"  NWK: Poll request unexpected event - %d\n\r",
+					sStackEvent.eType
+				);
+        		s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+        		//TODO: Handle error
+        	}
+
+			break;
 
         }
         break;
 
         case HANDLE_DATA_STATE:
         {
+        	//TODO: Handle data
+        	/* check if any messages to collect */
+			if ( ZQ_bQueueReceive(&APP_msgStrainGaugeEvents, &sStackEvent))
+			{
+				DBG_vPrintf(TRACE_APP, "APP: New event in the stack\n\r");
+			}
 
+			switch (sStackEvent.eType)
+			{
+				case ZPS_EVENT_NONE:
+				break;
+				case ZPS_EVENT_APS_INTERPAN_DATA_INDICATION:
+				{
+					 DBG_vPrintf(TRACE_APP, "  NWK: event ZPS_EVENT_APS_INTERPAN_DATA_INDICATION\n");
+					 PDUM_eAPduFreeAPduInstance(sStackEvent.uEvent.sApsInterPanDataIndEvent.hAPduInst);
+				}
+				break;
+
+				case ZPS_EVENT_APS_ZGP_DATA_INDICATION:
+				{
+					DBG_vPrintf(TRACE_APP, "  NWK: event ZPS_EVENT_APS_ZGP_DATA_INDICATION\n");
+					if (sStackEvent.uEvent.sApsZgpDataIndEvent.hAPduInst)
+					{
+						PDUM_eAPduFreeAPduInstance(sStackEvent.uEvent.sApsZgpDataIndEvent.hAPduInst);
+					}
+				}
+				break;
+
+				case ZPS_EVENT_APS_DATA_INDICATION:
+				{
+					DBG_vPrintf(TRACE_APP, "  NWK: APP_taskEndPoint: ZPS_EVENT_AF_DATA_INDICATION\n");
+
+					/* Process incoming cluster messages for this endpoint... */
+					DBG_vPrintf(TRACE_APP, "  Data Indication:\r\n");
+					DBG_vPrintf(TRACE_APP, "    Profile :%x\r\n",sStackEvent.uEvent.sApsDataIndEvent.u16ProfileId);
+					DBG_vPrintf(TRACE_APP, "    Cluster :%x\r\n",sStackEvent.uEvent.sApsDataIndEvent.u16ClusterId);
+					DBG_vPrintf(TRACE_APP, "    EndPoint:%x\r\n",sStackEvent.uEvent.sApsDataIndEvent.u8DstEndpoint);
+
+					/* free the application protocol data unit (APDU) once it has been dealt with */
+					PDUM_eAPduFreeAPduInstance(sStackEvent.uEvent.sApsDataIndEvent.hAPduInst);
+				}
+				break;
+
+				case ZPS_EVENT_APS_DATA_CONFIRM:
+				{
+					DBG_vPrintf(TRACE_APP, "  NWK: APP_taskEndPoint: ZPS_EVENT_APS_DATA_CONFIRM Status %d, Address 0x%04x\n",
+								sStackEvent.uEvent.sApsDataConfirmEvent.u8Status,
+								sStackEvent.uEvent.sApsDataConfirmEvent.uDstAddr.u16Addr);
+				}
+				break;
+
+				case ZPS_EVENT_APS_DATA_ACK:
+				{
+					DBG_vPrintf(TRACE_APP, "  NWK: APP_taskEndPoint: ZPS_EVENT_APS_DATA_ACK Status %d, Address 0x%04x\n",
+								sStackEvent.uEvent.sApsDataAckEvent.u8Status,
+								sStackEvent.uEvent.sApsDataAckEvent.u16DstAddr);
+				}
+				break;
+
+				default:
+				{
+					DBG_vPrintf(TRACE_APP, "  NWK: APP_taskEndPoint: unhandled event %d\n", sStackEvent.eType);
+				}
+				break;
+			}
+			//TODO: Change this
+			s_eDevice.currentState = PREP_TO_SLEEP_STATE;
         }
         break;
 
@@ -283,13 +443,52 @@ PUBLIC void APP_vtaskSleepingEndDevice()
 
         case PREP_TO_SLEEP_STATE:
         {
+        	DBG_vPrintf(TRACE_APP, "\n\rAPP: PREP_TO_SLEEP_STATE\n\r");
+
+        	DBG_vPrintf
+			(
+				TRACE_APP,
+				"APP: Sleep for %d seconds\n\r",
+				s_eDevice.sleepTime
+			);
+
+        	/* Set wakeup time */
+        	PWRM_eScheduleActivity
+			(
+				&sWake,
+				SECS_TO_TICKS(s_eDevice.sleepTime),
+				vWakeCallBack
+			);
+
+        	s_eDevice.currentState = SLEEP_STATE;
 
         }
         break;
 
+        case SLEEP_STATE:
+		{
+			/* Waits until OS sends the device to sleep */
+		}
+		break;
+
         case WAKE_UP_STATE:
 		{
+			if(s_network.isConnected)
+			{
+				/* Poll data from Stack */
+				ZPS_eAplZdoPoll();
 
+				DBG_vPrintf(TRACE_APP, "\n\rAPP: POLL_DATA_STATE\n\r");
+				s_eDevice.currentState = POLL_DATA_STATE;
+			}
+			else
+			{
+				DBG_vPrintf(TRACE_APP, "\n\rAPP: NETWORK_STATE\n\r");
+				s_eDevice.currentState = NETWORK_STATE;
+
+				DBG_vPrintf(TRACE_APP, "  NWK: NWK_STARTUP_STATE\n\r");
+				s_network.currentState = NWK_STARTUP_STATE;
+			}
 		}
 		break;
 
@@ -326,37 +525,62 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 {
 	ZPS_teStatus eStatus;
 
-	switch(networkState)
+	switch(s_network.currentState)
 	{
 		case NWK_STARTUP_STATE:
 		{
-		    /* Start the network stack as a end device */
-		    DBG_vPrintf(TRACE_APP, "  NWK: Starting ZPS\n\r");
-		    eStatus = ZPS_eAplZdoStartStack();
-
-		    if (ZPS_E_SUCCESS != eStatus)
+		    /* If network parameters were restored, Rejoin */
+		    if(s_network.currentEpid)
 		    {
 		    	DBG_vPrintf
 		    	(
 		    		TRACE_APP,
-		    		"  NWK: Failed to Start Stack. Status: %d\n\r",
-		    		eStatus
+		    		"  NWK: Trying to rejoin network 0x%016llx\n\r",
+		    		s_network.currentEpid
 		    	);
-		    	//TODO: Handle errors
-		    	s_eDevice.isConnected = FALSE;
-		    	return;
-		    }
 
-		    /* If network parameters were restored, Rejoin */
-		    if(s_eDevice.currentEpid)
-		    {
-		    	DBG_vPrintf(TRACE_APP, "  NWK: NWK_REJOIN_STATE\n\r");
-		    	networkState = NWK_REJOIN_STATE;
+		    	ZPS_eAplAibSetApsUseExtendedPanId(s_network.currentEpid);
+
+		    	/* Rejoin stored network without a discovery process */
+		    	eStatus = ZPS_eAplZdoRejoinNetwork(FALSE);
+
+		    	if (ZPS_E_SUCCESS != eStatus)
+				{
+					DBG_vPrintf
+					(
+						TRACE_APP,
+						"  NWK: Failed rejoin request, status = %d\n\r",
+						eStatus
+					);
+					s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+					//TODO: Handle errors
+				}
+
+		    	DBG_vPrintf(TRACE_APP, "\n\r  NWK: NWK_REJOIN_STATE\n\r");
+		    	s_network.currentState = NWK_REJOIN_STATE;
 		    }
 		    else /* Discovery */
 		    {
-		    	DBG_vPrintf(TRACE_APP, "  NWK: NWK_DISC_STATE\n\r");
-		    	networkState = NWK_DISC_STATE;
+		    	ZPS_eAplAibSetApsUseExtendedPanId(0);
+
+		    	/* Start the network stack as a end device */
+				DBG_vPrintf(TRACE_APP, "  NWK: Starting ZPS\n\r");
+				eStatus = ZPS_eAplZdoStartStack();
+
+				if (ZPS_E_SUCCESS != eStatus)
+				{
+					DBG_vPrintf
+					(
+						TRACE_APP,
+						"  NWK: Failed to Start Stack, status = %d\n\r",
+						eStatus
+					);
+					s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+					//TODO: Handle error
+				}
+
+		    	DBG_vPrintf(TRACE_APP, "\n\r  NWK: NWK_DISC_STATE\n\r");
+		    	s_network.currentState = NWK_DISC_STATE;
 		    }
 		}
 		break;
@@ -381,9 +605,10 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 	    			DBG_vPrintf
 	    			(
 	    				TRACE_APP,
-	    				"  NWK: Network discovery failed with error %d\n\r",
+	    				"  NWK: Network discovery failed, status = %d\n\r",
 	    				sStackEvent.uEvent.sNwkDiscoveryEvent.eStatus
 	    			);
+	    			s_eDevice.currentState = PREP_TO_SLEEP_STATE;
 	    			//TODO: Handle error
 	    		}
 	    		else /* Discovery process successful */
@@ -418,30 +643,24 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 						{
 							DBG_vPrintf(TRACE_APP, "  NWK: Joining network\n\r");
 							DBG_vPrintf(TRACE_APP, "  NWK: Ext PAN ID = 0x%016llx\n", psNwkDescr->u64ExtPanId);
-							networkState = NWK_JOIN_STATE;
+							DBG_vPrintf(TRACE_APP, "\n\r  NWK: NWK_JOIN_STATE\n\r");
+							s_network.currentState = NWK_JOIN_STATE;
 						}
 						else
 						{
 							DBG_vPrintf
 							(
 								TRACE_APP,
-								"  NWK: Failed to request network join : %d\n\r",
+								"  NWK: Failed to request network join, status = %d\n\r",
 								eStatus
 							);
+							s_eDevice.currentState = PREP_TO_SLEEP_STATE;
 							//TODO: Handle ERROR
 						}
 	    			}
 	    		}
 
 	    	}
-	    	else if(sStackEvent.eType == ZPS_EVENT_NWK_FAILED_TO_JOIN)
-			{
-
-			}
-	    	else if(sStackEvent.eType == ZPS_EVENT_NWK_JOINED_AS_ENDDEVICE)
-			{
-
-			}
 	    	else
 	    	{
 	    		DBG_vPrintf
@@ -450,6 +669,7 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 	    			"  NWK: Discovery unexpected event - %d\n\r",
 	    			sStackEvent.eType
 	    		);
+	    		s_eDevice.currentState = PREP_TO_SLEEP_STATE;
 	    		//TODO: Handle error
 	    	}
 
@@ -471,19 +691,17 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 				    sStackEvent.uEvent.sNwkJoinedEvent.u16Addr
 				);
 
-				s_eDevice.currentEpid = ZPS_u64NwkNibGetEpid(ZPS_pvAplZdoGetNwkHandle());
+				s_network.currentEpid = ZPS_u64NwkNibGetEpid(ZPS_pvAplZdoGetNwkHandle());
 
 				PDM_eSaveRecordData
 				(
 					PDM_APP_ID_EPID,
-				    &s_eDevice.currentEpid,
-				    sizeof(s_eDevice.currentEpid)
+				    &s_network.currentEpid,
+				    sizeof(s_network.currentEpid)
 				);
 
-				//TODO: Save network epid
 				//TODO: Request AUTH and go to AUTH State
-
-				networkState = NWK_AUTH_STATE;
+				s_network.isConnected = TRUE;
 			}
 
 			/* Node failed to join */
@@ -492,9 +710,10 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 				DBG_vPrintf
 				(
 					TRACE_APP,
-					"  NWK: Node failed to join network. Status: %d\n\r",
+					"  NWK: Node failed to join network, status = %d\n\r",
 					sStackEvent.uEvent.sNwkJoinFailedEvent.u8Status
 				);
+				s_eDevice.currentState = PREP_TO_SLEEP_STATE;
 				//TODO: Handle error
 			}
 			else /* Unexpected event */
@@ -505,6 +724,7 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 					"  NWK: Join unexpected event - %d\n\r",
 					sStackEvent.eType
 				);
+				s_eDevice.currentState = PREP_TO_SLEEP_STATE;
 				//TODO: Handle error
 			}
 		}
@@ -512,9 +732,8 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 
 		case NWK_AUTH_STATE:
 		{
+			//TODO: all of this
 			DBG_vPrintf(TRACE_APP,"  NWK: AUTH State\n\r");
-			DBG_vPrintf(TRACE_APP,"  NWK: Schedule activity in %d seconds\n\r", NO_NETWORK_SLEEP_DUR);
-			PWRM_eScheduleActivity(&sWake, SECS_TO_TICKS(NO_NETWORK_SLEEP_DUR), AppWakeRoutine);
 		}
 		break;
 
@@ -539,18 +758,29 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 					sStackEvent.uEvent.sNwkJoinedEvent.u16Addr
 				);
 
-				//TODO: Request AUTH and go to AUTH State
+				/* Device reconnected successfully */
+				s_network.isConnected = TRUE;
 			}
 
 			/* Node failed rejoin */
 			else if(sStackEvent.eType == ZPS_EVENT_NWK_FAILED_TO_JOIN)
 			{
+				uint8 eStatus;
+				eStatus = sStackEvent.uEvent.sNwkJoinFailedEvent.u8Status;
+
 				DBG_vPrintf
 				(
 					TRACE_APP,
-					"  NWK: Node failed to rejoin network. Status: %d\n\r",
-					sStackEvent.uEvent.sNwkJoinFailedEvent.u8Status
+					"  NWK: Node failed to rejoin network, status = %d\n\r",
+					eStatus
 				);
+				/* Can't find saved network */
+				if(eStatus == ZPS_NWK_ENUM_NO_NETWORKS)
+				{
+					DBG_vPrintf(TRACE_APP,"  NWK: Can't find network\n\r");
+					//TODO: after X strikes, delete network parameters
+				}
+				s_eDevice.currentState = PREP_TO_SLEEP_STATE;
 				//TODO: Handle error
 			}
 			else /* Unexpected event */
@@ -561,6 +791,7 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 					"  NWK: Rejoin unexpected event - %d\n\r",
 					sStackEvent.eType
 				);
+				s_eDevice.currentState = PREP_TO_SLEEP_STATE;
 				//TODO: Handle error
 			}
 		}
@@ -568,21 +799,19 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 
 		default:
 		{
-			//TODO: Handle error
 			DBG_vPrintf
 			(
 				TRACE_APP,
 				"  NWK: Unhandled State : %d\n",
-				networkState
+				s_network.currentState
 			);
+			s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+			//TODO: Handle error
 		}
 		break;
 	}
 }
 
-/****************************************************************************/
-/***        Local Functions                                               ***/
-/****************************************************************************/
 /****************************************************************************
  *
  * NAME: APP_vGenCallback
@@ -605,7 +834,23 @@ PUBLIC void APP_vGenCallback(uint8 u8Endpoint, ZPS_tsAfEvent *psStackEvent)
     	ZQ_bQueueSend(&APP_msgStrainGaugeEvents, (void*) psStackEvent);
     }
 }
-
 /****************************************************************************/
 /***        END OF FILE                                                   ***/
 /****************************************************************************/
+
+
+/* TODO: errores registrados
+ * Despues de 3 poll de data y no recibir ack, el nodo "deja" la red y se queda pegado en POLL_DATA_STATE
+ * con un reset, intenta reingresar a la red pero se obtiene error "NWK: Node failed to rejoin network. Status: 235"
+ * con otro reset el nodo logra conectarse a traves de un rejoin.
+ *
+ * Despues de reprogamar el concentrador, todos los nodos previamente asociados "pierden" conexion. Despues de 3 intentos
+ * el nodo "deja" la red y no puede volver a conectarse con rejoin. Hay que ver que pasa si se elimina el EPID.
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ */

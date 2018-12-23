@@ -53,7 +53,7 @@
 /****************************************************************************/
 /***        Macro Definitions                                             ***/
 /****************************************************************************/
-#define VERSION_MAJOR    1
+#define VERSION_MAJOR    2
 #define VERSION_MINOR    0
 
 #define AUTH_CODE   0xE241171A

@@ -44,6 +44,7 @@
 #define CHANNEL_A_DEFAULT_VALUE		2048	// DAC's channel A
 #define CHANNEL_B_DEFAULT_VALUE		2048	// DAC's channel B
 #define GAIN_DEFAULT_VALUE			32		// INAMP Gain
+#define DEFAULT_SLEEP_TIME			5		// seconds TODO: change this in production
 
 /****************************************************************************/
 /***        Type Definitions                                              ***/
@@ -73,15 +74,14 @@ typedef enum
 
 typedef struct
 {
-	uint64						currentEpid;
 	bool						isConfigured;
-	bool						isConnected;
 	uint16						channelAValue;
 	uint16						channelBValue;
 	uint16						gainValue;
 	uint16						sensorValue;
 	uint16						temperatureValue;
 	uint16						batteryLevel;
+	uint16						sleepTime;
 	sleepingEndDeviceStates_t   currentState;
 	sleepingEndDeviceStates_t   previousState;
 } seDeviceDesc_t;
