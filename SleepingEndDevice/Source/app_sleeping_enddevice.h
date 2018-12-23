@@ -73,7 +73,7 @@ typedef enum
 
 typedef struct
 {
-	uint16						currentEpid;
+	uint64						currentEpid;
 	bool						isConfigured;
 	bool						isConnected;
 	uint16						channelAValue;

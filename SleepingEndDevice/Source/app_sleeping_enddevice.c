@@ -176,7 +176,7 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
 		);
     }
 
-    DBG_vPrintf(TRACE_APP, "APP: EPID: %d\n\r", s_eDevice.currentEpid);
+    DBG_vPrintf(TRACE_APP, "APP: EPID: 0x%016llx\n\r", s_eDevice.currentEpid);
     DBG_vPrintf(TRACE_APP, "APP: CONFIGURED: %d\n\r", s_eDevice.isConfigured);
     DBG_vPrintf(TRACE_APP, "APP: CHANNEL_A: %d\n\r", s_eDevice.channelAValue);
     DBG_vPrintf(TRACE_APP, "APP: CHANNEL_B: %d\n\r", s_eDevice.channelBValue);
@@ -322,7 +322,7 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 		case NWK_STARTUP_STATE:
 		{
 		    /* Start the network stack as a end device */
-		    DBG_vPrintf(TRACE_APP, "\n\rNWK: Starting ZPS\n\r");
+		    DBG_vPrintf(TRACE_APP, "  NWK: Starting ZPS\n\r");
 		    eStatus = ZPS_eAplZdoStartStack();
 
 		    if (ZPS_E_SUCCESS != eStatus)
@@ -330,7 +330,7 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 		    	DBG_vPrintf
 		    	(
 		    		TRACE_APP,
-		    		"NWK: Failed to Start Stack. Status: %d\n\r",
+		    		"  NWK: Failed to Start Stack. Status: %d\n\r",
 		    		eStatus
 		    	);
 		    	//TODO: Handle errors
@@ -341,12 +341,12 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 		    /* If network parameters were restored, Rejoin */
 		    if(s_eDevice.currentEpid)
 		    {
-		    	DBG_vPrintf(TRACE_APP, "NWK: NWK_REJOIN_STATE\n\r");
+		    	DBG_vPrintf(TRACE_APP, "  NWK: NWK_REJOIN_STATE\n\r");
 		    	networkState = NWK_REJOIN_STATE;
 		    }
 		    else /* Discovery */
 		    {
-		    	DBG_vPrintf(TRACE_APP, "NWK: NWK_DISC_STATE\n\r");
+		    	DBG_vPrintf(TRACE_APP, "  NWK: NWK_DISC_STATE\n\r");
 		    	networkState = NWK_DISC_STATE;
 		    }
 		}
@@ -363,7 +363,7 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 	    		DBG_vPrintf
 	    		(
 	    			TRACE_APP,
-	    			"NWK: Network discovery complete\n\r"
+	    			"  NWK: Network discovery complete\n\r"
 	    		);
 
 	    		/* If there is any error in the discovery process stops */
@@ -372,7 +372,7 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 	    			DBG_vPrintf
 	    			(
 	    				TRACE_APP,
-	    				"NWK: Network discovery failed with error %d\n\r",
+	    				"  NWK: Network discovery failed with error %d\n\r",
 	    				sStackEvent.uEvent.sNwkDiscoveryEvent.eStatus
 	    			);
 	    			//TODO: Handle error
@@ -385,7 +385,7 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 	    				DBG_vPrintf
 	    				(
 	    					TRACE_APP,
-	    					"NWK: No network found\n\r"
+	    					"  NWK: No network found\n\r"
 	    				);
 	    			}
 	    			else /* Networks found */
@@ -393,7 +393,7 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 	    				DBG_vPrintf
 						(
 							TRACE_APP,
-							"NWK: Found %d networks\n\r",
+							"  NWK: Found %d networks\n\r",
 							sStackEvent.uEvent.sNwkDiscoveryEvent.u8NetworkCount
 						);
 
@@ -407,8 +407,8 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 						eStatus = ZPS_eAplZdoJoinNetwork(psNwkDescr);
 						if (eStatus == ZPS_E_SUCCESS)
 						{
-							DBG_vPrintf(TRACE_APP, "NWK: Joining network\n\r");
-							DBG_vPrintf(TRACE_APP, "NWK: Ext PAN ID = 0x%016llx\n", psNwkDescr->u64ExtPanId);
+							DBG_vPrintf(TRACE_APP, "  NWK: Joining network\n\r");
+							DBG_vPrintf(TRACE_APP, "  NWK: Ext PAN ID = 0x%016llx\n", psNwkDescr->u64ExtPanId);
 							networkState = NWK_JOIN_STATE;
 						}
 						else
@@ -416,7 +416,7 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 							DBG_vPrintf
 							(
 								TRACE_APP,
-								"NWK: Failed to request network join : %d\n\r",
+								"  NWK: Failed to request network join : %d\n\r",
 								eStatus
 							);
 							//TODO: Handle ERROR
@@ -438,7 +438,7 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 	    		DBG_vPrintf
 	    		(
 	    			TRACE_APP,
-	    			"NWK: Discovery unexpected event - %d\n\r",
+	    			"  NWK: Discovery unexpected event - %d\n\r",
 	    			sStackEvent.eType
 	    		);
 	    		//TODO: Handle error
@@ -458,11 +458,20 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 				DBG_vPrintf
 				(
 					TRACE_APP,
-					"NWK: Node joined network with Address 0x%04x\n",
+					"  NWK: Node joined network with Address 0x%04x\n",
 				    sStackEvent.uEvent.sNwkJoinedEvent.u16Addr
 				);
 
-				//TODO: Save network info
+				s_eDevice.currentEpid = ZPS_u64NwkNibGetEpid(ZPS_pvAplZdoGetNwkHandle());
+
+				PDM_eSaveRecordData
+				(
+					PDM_APP_ID_EPID,
+				    &s_eDevice.currentEpid,
+				    sizeof(s_eDevice.currentEpid)
+				);
+
+				//TODO: Save network epid
 				//TODO: Request AUTH and go to AUTH State
 			}
 
@@ -472,7 +481,7 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 				DBG_vPrintf
 				(
 					TRACE_APP,
-					"NWK: Node failed to join network. Status: %d\n\r",
+					"  NWK: Node failed to join network. Status: %d\n\r",
 					sStackEvent.uEvent.sNwkJoinFailedEvent.u8Status
 				);
 				//TODO: Handle error
@@ -482,7 +491,7 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 				DBG_vPrintf
 				(
 					TRACE_APP,
-					"NWK: Join unexpected event - %d\n\r",
+					"  NWK: Join unexpected event - %d\n\r",
 					sStackEvent.eType
 				);
 				//TODO: Handle error
@@ -504,7 +513,43 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 
 		case NWK_REJOIN_STATE:
 		{
+			/* If there is no event breaks */
+			if(sStackEvent.eType == ZPS_EVENT_NONE) break;
 
+			/* Node rejoined as end device */
+			else if(sStackEvent.eType == ZPS_EVENT_NWK_JOINED_AS_ENDDEVICE)
+			{
+				DBG_vPrintf
+				(
+					TRACE_APP,
+					"  NWK: Node rejoined network with Address 0x%04x\n",
+					sStackEvent.uEvent.sNwkJoinedEvent.u16Addr
+				);
+
+				//TODO: Request AUTH and go to AUTH State
+			}
+
+			/* Node failed rejoin */
+			else if(sStackEvent.eType == ZPS_EVENT_NWK_FAILED_TO_JOIN)
+			{
+				DBG_vPrintf
+				(
+					TRACE_APP,
+					"  NWK: Node failed to rejoin network. Status: %d\n\r",
+					sStackEvent.uEvent.sNwkJoinFailedEvent.u8Status
+				);
+				//TODO: Handle error
+			}
+			else /* Unexpected event */
+			{
+				DBG_vPrintf
+				(
+					TRACE_APP,
+					"  NWK: Rejoin unexpected event - %d\n\r",
+					sStackEvent.eType
+				);
+				//TODO: Handle error
+			}
 		}
 		break;
 
@@ -514,7 +559,7 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 			DBG_vPrintf
 			(
 				TRACE_APP,
-				"NWK: Unhandled State : %d\n",
+				"  NWK: Unhandled State : %d\n",
 				networkState
 			);
 		}
