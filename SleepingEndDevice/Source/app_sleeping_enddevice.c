@@ -82,13 +82,14 @@ typedef struct
 /****************************************************************************/
 
 PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent);
-PUBLIC uint8 au8DefaultTCLinkKey[16] = "ZigBeeAlliance09";
+PRIVATE void vHandleIncomingFrame(ZPS_tsAfEvent sStackEvent);
 
 /****************************************************************************/
 /***        Exported Variables                                            ***/
 /****************************************************************************/
 
 PUBLIC pwrm_tsWakeTimerEvent sWake;
+PUBLIC uint8 au8DefaultTCLinkKey[16] = "ZigBeeAlliance09";
 
 /****************************************************************************/
 /***        Local Variables                                               ***/
@@ -145,6 +146,7 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
     s_network.noNwkStrikes = 0;
 
     s_eDevice.isConfigured = FALSE;
+    s_eDevice.samplePeriod = DEFAULT_SLEEP_TIME; //TODO: Create macro for this
     s_eDevice.channelAValue = CHANNEL_A_DEFAULT_VALUE;
     s_eDevice.channelBValue = CHANNEL_B_DEFAULT_VALUE;
     s_eDevice.gainValue = GAIN_DEFAULT_VALUE;
@@ -393,9 +395,13 @@ PUBLIC void APP_vtaskSleepingEndDevice()
 
 					/* Process incoming cluster messages for this endpoint... */
 					DBG_vPrintf(TRACE_APP, "  Data Indication:\r\n");
+					DBG_vPrintf(TRACE_APP, "    Status  :%d\r\n",sStackEvent.uEvent.sApsDataIndEvent.eStatus);
 					DBG_vPrintf(TRACE_APP, "    Profile :%x\r\n",sStackEvent.uEvent.sApsDataIndEvent.u16ProfileId);
 					DBG_vPrintf(TRACE_APP, "    Cluster :%x\r\n",sStackEvent.uEvent.sApsDataIndEvent.u16ClusterId);
 					DBG_vPrintf(TRACE_APP, "    EndPoint:%x\r\n",sStackEvent.uEvent.sApsDataIndEvent.u8DstEndpoint);
+					DBG_vPrintf(TRACE_APP, "    LQI     :%d\r\n",sStackEvent.uEvent.sApsDataIndEvent.u8LinkQuality);
+
+					vHandleIncomingFrame(sStackEvent);
 
 					/* free the application protocol data unit (APDU) once it has been dealt with */
 					PDUM_eAPduFreeAPduInstance(sStackEvent.uEvent.sApsDataIndEvent.hAPduInst);
@@ -814,6 +820,92 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 
 /****************************************************************************
  *
+ * NAME: vHandleIncomingFrame
+ *
+ * DESCRIPTION:
+ * Process incoming frame
+ *
+ * RETURNS:
+ * void
+ *
+ ****************************************************************************/
+PRIVATE void vHandleIncomingFrame(ZPS_tsAfEvent sStackEvent)
+{
+	uint8 idByte = 0;
+	uint16 byteCount;
+
+	byteCount = PDUM_u16APduInstanceReadNBO
+	(
+		sStackEvent.uEvent.sApsDataIndEvent.hAPduInst,
+	    0,
+	    "b",
+	    &idByte
+	);
+
+	/* Size mismatch */
+	if(byteCount == 0)
+	{
+		DBG_vPrintf(TRACE_APP, "  APP: Frame error, size = 0\n\r");
+		return;
+	}
+
+	switch(idByte)
+	{
+		/* configuration parameters */
+		case '~':
+		{
+			DBG_vPrintf(TRACE_APP, "  APP: Configuration frame\n\r");
+
+			struct
+			{
+				uint16 inSamplePeriod;
+				uint16 inChannelAValue;
+				uint16 inChannelBValue;
+				uint16 inGainValue;
+			} values = { 0 };
+
+			byteCount = PDUM_u16APduInstanceReadNBO
+			(
+				sStackEvent.uEvent.sApsDataIndEvent.hAPduInst,
+			    1,
+			    "hhhh",
+			     &values
+			);
+
+			if(byteCount == 8)
+			{
+				s_eDevice.samplePeriod = values.inSamplePeriod;
+				channelAValue = values.inChannelAValue;
+				channelBValue = values.inChannelBValue;
+				gainValue = values.inGainValue;
+
+				DBG_vPrintf(TRACE_APP, "        samplePeriod = 0x%04x\n", samplePeriod);
+				DBG_vPrintf(TRACE_APP, "        channelA = 0x%04x\n", channelAValue);
+				DBG_vPrintf(TRACE_APP, "        channelB = 0x%04x\n", channelBValue);
+				DBG_vPrintf(TRACE_APP, "        gainValue = 0x%04x\n", gainValue);
+			}
+
+		}
+		break;
+
+		/* GO command */
+		case '$':
+		{
+			DBG_vPrintf(TRACE_APP, "  APP: GO command frame\n\r");
+		}
+		break;
+
+		/* Broadcast request */
+		case '&':
+		{
+			DBG_vPrintf(TRACE_APP, "  APP: Broadcast request frame\n\r");
+		}
+		break;
+	}
+}
+
+/****************************************************************************
+ *
  * NAME: APP_vGenCallback
  *
  * DESCRIPTION:
@@ -846,9 +938,21 @@ PUBLIC void APP_vGenCallback(uint8 u8Endpoint, ZPS_tsAfEvent *psStackEvent)
  *
  * Despues de reprogamar el concentrador, todos los nodos previamente asociados "pierden" conexion. Despues de 3 intentos
  * el nodo "deja" la red y no puede volver a conectarse con rejoin. Hay que ver que pasa si se elimina el EPID.
+ * Una teoria es que el feature de seguridad "frame counter" es el que rechaza mensajes del nodo.
  *
+ * Despues de ingresar a una red se genera un POLL event con supuestamente data valida. El handler de Data no detecta ningun
+ * evento en la version actual, hace 2 commits aprox arrojaba evento 15 equivalente a ZPS_EVENT_NWK_POLL_CONFIRM. Por otro lado,
+ * cuando un nodo ingresa a la red, el coordinador siempre arroja la siguiente secuencia:
  *
- *
+ * APP: No event to process
+ * APP: vCheckStackEvent: vCheckStackEvent: ZPS_EVENT_NEW_NODE_HAS_JOINED, Nwk Addr=0x542b
+ * APP: No event to process
+ * APP: vCheckStackEvent: ZPS_EVENT_AF_DATA_INDICATION
+ *        Profile :0
+ *        Cluster :13
+ *        EndPoint:0
+ * APP: No event to process
+ * APP: vCheckStackEvent: ZPS_EVENT_ROUTE_DISCOVERY_CFM
  *
  *
  *
