@@ -846,6 +846,7 @@ PRIVATE void vHandleIncomingFrame(ZPS_tsAfEvent sStackEvent)
 	if(byteCount == 0)
 	{
 		DBG_vPrintf(TRACE_APP, "  APP: Frame error, size = 0\n\r");
+		//TODO: Handle error
 		return;
 	}
 
@@ -872,17 +873,41 @@ PRIVATE void vHandleIncomingFrame(ZPS_tsAfEvent sStackEvent)
 			     &values
 			);
 
-			if(byteCount == 8)
+			/* Size mismatch */
+			if(byteCount != 8)
+			{
+				DBG_vPrintf(TRACE_APP, "  APP: Frame error, size = %d\r\n", byteCount);
+				//TODO: Handle error
+				return;
+			}
+			/* size OK */
+			else
 			{
 				s_eDevice.samplePeriod = values.inSamplePeriod;
-				channelAValue = values.inChannelAValue;
-				channelBValue = values.inChannelBValue;
-				gainValue = values.inGainValue;
+				s_eDevice.channelAValue = values.inChannelAValue;
+				s_eDevice.channelBValue = values.inChannelBValue;
+				s_eDevice.gainValue = values.inGainValue;
 
-				DBG_vPrintf(TRACE_APP, "        samplePeriod = 0x%04x\n", samplePeriod);
-				DBG_vPrintf(TRACE_APP, "        channelA = 0x%04x\n", channelAValue);
-				DBG_vPrintf(TRACE_APP, "        channelB = 0x%04x\n", channelBValue);
-				DBG_vPrintf(TRACE_APP, "        gainValue = 0x%04x\n", gainValue);
+				DBG_vPrintf(TRACE_APP, "  APP: Configuration values received:\r\n");
+				DBG_vPrintf(TRACE_APP, "    samplePeriod = 0x%04x\n", s_eDevice.samplePeriod);
+				DBG_vPrintf(TRACE_APP, "    channelA = 0x%04x\n", s_eDevice.channelAValue);
+				DBG_vPrintf(TRACE_APP, "    channelB = 0x%04x\n", s_eDevice.channelBValue);
+				DBG_vPrintf(TRACE_APP, "    gainValue = 0x%04x\n", s_eDevice.gainValue);
+
+				/* Store parameters in flash */
+
+				PDM_teStatus status;
+				status = PDM_eSaveRecordData(PDM_APP_ID_SAMPLE_PERIOD, &s_eDevice.samplePeriod, sizeof(s_eDevice.samplePeriod));
+				if(status != PDM_E_STATUS_OK) DBG_vPrintf(TRACE_APP, "  APP: PDM_APP_ID_SAMPLE_PERIOD save error, status = %d\n", status);
+
+				status = PDM_eSaveRecordData(PDM_APP_ID_CHANNEL_A, &s_eDevice.channelAValue, sizeof(s_eDevice.channelAValue));
+				if(status != PDM_E_STATUS_OK) DBG_vPrintf(TRACE_APP, "  APP: PDM_APP_ID_CHANNEL_A save error, status = %d\n", status);
+
+				status = PDM_eSaveRecordData(PDM_APP_ID_CHANNEL_B, &s_eDevice.channelBValue, sizeof(s_eDevice.channelBValue));
+				if(status != PDM_E_STATUS_OK) DBG_vPrintf(TRACE_APP, "  APP: PDM_APP_ID_CHANNEL_B save error, status = %d\n", status);
+
+				status = PDM_eSaveRecordData(PDM_APP_ID_GAIN, &s_eDevice.gainValue, sizeof(s_eDevice.gainValue));
+				if(status != PDM_E_STATUS_OK) DBG_vPrintf(TRACE_APP, "  APP: PDM_APP_ID_GAIN save error, status = %d\n", status);
 			}
 
 		}
