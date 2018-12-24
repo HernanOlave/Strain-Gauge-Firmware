@@ -873,6 +873,8 @@ PRIVATE void vHandleIncomingFrame(ZPS_tsAfEvent sStackEvent)
 			     &values
 			);
 
+			//TODO: Check byteCount
+
 			/* Size mismatch */
 			if(byteCount != 8)
 			{
