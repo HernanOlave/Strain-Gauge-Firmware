@@ -108,7 +108,7 @@ tszQueue APP_msgZpsEvents;
 
 PUBLIC void vWakeCallBack(void)
 {
-	DBG_vPrintf(TRACE_APP, "\n\r*** WAKE UP ROUTINE ***\n\r");
+	DBG_vPrintf(TRACE_APP, "\n\r\n\r*** WAKE UP ROUTINE ***\n\r");
 	DBG_vPrintf(TRACE_APP, "APP: WAKE_UP_STATE\n\r");
 	s_eDevice.currentState = WAKE_UP_STATE;
 }
@@ -393,7 +393,7 @@ PUBLIC void APP_vtaskSleepingEndDevice()
 
 				case ZPS_EVENT_APS_DATA_INDICATION:
 				{
-					DBG_vPrintf(TRACE_APP, "  NWK: APP_taskEndPoint: ZPS_EVENT_AF_DATA_INDICATION\n");
+					DBG_vPrintf(TRACE_APP, "  NWK: event ZPS_EVENT_AF_DATA_INDICATION\n");
 
 					/* Process incoming cluster messages for this endpoint... */
 					DBG_vPrintf(TRACE_APP, "  Data Indication:\r\n");
@@ -412,7 +412,7 @@ PUBLIC void APP_vtaskSleepingEndDevice()
 
 				case ZPS_EVENT_APS_DATA_CONFIRM:
 				{
-					DBG_vPrintf(TRACE_APP, "  NWK: APP_taskEndPoint: ZPS_EVENT_APS_DATA_CONFIRM Status %d, Address 0x%04x\n",
+					DBG_vPrintf(TRACE_APP, "  NWK: event ZPS_EVENT_APS_DATA_CONFIRM Status %d, Address 0x%04x\n",
 								sStackEvent.uEvent.sApsDataConfirmEvent.u8Status,
 								sStackEvent.uEvent.sApsDataConfirmEvent.uDstAddr.u16Addr);
 				}
@@ -420,7 +420,7 @@ PUBLIC void APP_vtaskSleepingEndDevice()
 
 				case ZPS_EVENT_APS_DATA_ACK:
 				{
-					DBG_vPrintf(TRACE_APP, "  NWK: APP_taskEndPoint: ZPS_EVENT_APS_DATA_ACK Status %d, Address 0x%04x\n",
+					DBG_vPrintf(TRACE_APP, "  NWK: event ZPS_EVENT_APS_DATA_ACK Status %d, Address 0x%04x\n",
 								sStackEvent.uEvent.sApsDataAckEvent.u8Status,
 								sStackEvent.uEvent.sApsDataAckEvent.u16DstAddr);
 				}
@@ -428,7 +428,7 @@ PUBLIC void APP_vtaskSleepingEndDevice()
 
 				default:
 				{
-					DBG_vPrintf(TRACE_APP, "  NWK: APP_taskEndPoint: unhandled event %d\n", sStackEvent.eType);
+					DBG_vPrintf(TRACE_APP, "  NWK: unhandled event %d\n", sStackEvent.eType);
 				}
 				break;
 			}
@@ -882,8 +882,6 @@ PRIVATE void vHandleIncomingFrame(ZPS_tsAfEvent sStackEvent)
 			     &values
 			);
 
-			//TODO: Check byteCount
-
 			/* Size mismatch */
 			if(byteCount != 8)
 			{
@@ -906,7 +904,6 @@ PRIVATE void vHandleIncomingFrame(ZPS_tsAfEvent sStackEvent)
 				DBG_vPrintf(TRACE_APP, "    gainValue = 0x%04x\n", s_eDevice.gainValue);
 
 				/* Store parameters in flash */
-
 				PDM_teStatus status;
 				status = PDM_eSaveRecordData(PDM_APP_ID_SAMPLE_PERIOD, &s_eDevice.samplePeriod, sizeof(s_eDevice.samplePeriod));
 				if(status != PDM_E_STATUS_OK) DBG_vPrintf(TRACE_APP, "  APP: PDM_APP_ID_SAMPLE_PERIOD save error, status = %d\n", status);
@@ -920,9 +917,62 @@ PRIVATE void vHandleIncomingFrame(ZPS_tsAfEvent sStackEvent)
 				status = PDM_eSaveRecordData(PDM_APP_ID_GAIN, &s_eDevice.gainValue, sizeof(s_eDevice.gainValue));
 				if(status != PDM_E_STATUS_OK) DBG_vPrintf(TRACE_APP, "  APP: PDM_APP_ID_GAIN save error, status = %d\n", status);
 
-				//TODO: Send response to Coordinator
-			}
+				/* Allocate memory for APDU buffer with preconfigured "type" */
+				PDUM_thAPduInstance data = PDUM_hAPduAllocateAPduInstance(apduMyData);
+				if(data == PDUM_INVALID_HANDLE)
+				{
+					/* Problem allocating APDU instance memory */
+					DBG_vPrintf(TRACE_APP, "  APP: Unable to allocate APDU memory\n");
+					//TODO: Handle error
+				}
+				else
+				{
+					/* Load payload data into APDU */
+					byteCount = PDUM_u16APduInstanceWriteNBO
+					(
+						data,		// APDU instance handle
+						0,			// APDU position for data
+						"bhhhh",	// data format string
+						'~',
+						s_eDevice.samplePeriod,
+						s_eDevice.channelAValue,
+						s_eDevice.channelBValue,
+						s_eDevice.gainValue
+					);
 
+					if( byteCount == 0 )
+					{
+						/* No data was written to the APDU instance */
+						DBG_vPrintf(TRACE_APP, "  APP: No data written to APDU\n");
+						//TODO: Handle error
+					}
+					else
+					{
+						PDUM_eAPduInstanceSetPayloadSize(data, byteCount);
+						DBG_vPrintf(TRACE_APP, "  APP: Data written to APDU: %d\n", byteCount);
+
+						/* Request data send to destination */
+						status = ZPS_eAplAfUnicastDataReq
+						(
+							data,					// APDU instance handle
+							0xFFFF,					// cluster ID
+							1,						// source endpoint
+							1,						// destination endpoint
+							0x0000,					// destination network address
+							ZPS_E_APL_AF_UNSECURE,	// security mode
+							0,						// radius
+							NULL					// sequence number pointer
+						);
+
+						if( status != ZPS_E_SUCCESS )
+						{
+							/* Problem with request */
+							DBG_vPrintf(TRACE_APP, "  APP: AckDataReq not successful, status = %d\n\r", status);
+							//TODO: Add strike count and handle error
+						}
+					}
+				}
+			}
 		}
 		break;
 
