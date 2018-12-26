@@ -75,6 +75,7 @@ typedef struct
 	bool				isConnected;
 	uint8				ackStrikes;
 	uint8				noNwkStrikes;
+	uint8				rejoinStrikes;
 } networkDesc_t;
 
 /****************************************************************************/
@@ -144,6 +145,7 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
     s_network.isConnected = FALSE;
     s_network.ackStrikes = 0;
     s_network.noNwkStrikes = 0;
+    s_network.rejoinStrikes = 0;
 
     s_eDevice.isConfigured = FALSE;
     s_eDevice.samplePeriod = DEFAULT_SLEEP_TIME; //TODO: Create macro for this
@@ -783,7 +785,14 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 				/* Can't find saved network */
 				if(eStatus == ZPS_NWK_ENUM_NO_NETWORKS)
 				{
-					DBG_vPrintf(TRACE_APP,"  NWK: Can't find network\n\r");
+					s_network.rejoinStrikes++;
+					DBG_vPrintf
+					(
+						TRACE_APP,
+						"  NWK: Can't find network, strike = %d\n\r",
+						s_network.rejoinStrikes
+					);
+
 					//TODO: after X strikes, delete network parameters
 				}
 				s_eDevice.currentState = PREP_TO_SLEEP_STATE;
@@ -910,6 +919,8 @@ PRIVATE void vHandleIncomingFrame(ZPS_tsAfEvent sStackEvent)
 
 				status = PDM_eSaveRecordData(PDM_APP_ID_GAIN, &s_eDevice.gainValue, sizeof(s_eDevice.gainValue));
 				if(status != PDM_E_STATUS_OK) DBG_vPrintf(TRACE_APP, "  APP: PDM_APP_ID_GAIN save error, status = %d\n", status);
+
+				//TODO: Send response to Coordinator
 			}
 
 		}
