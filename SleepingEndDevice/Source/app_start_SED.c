@@ -151,13 +151,13 @@ PUBLIC void vAppMain(void)
     vAHI_SetStackOverflow(TRUE, (uint32)&_stack_low_water_mark);
 #endif
     /*
-     * Catch resets due to watchdog timer expiry. TODO Comment out to harden code.
+     * Catch resets due to watchdog timer expiry.
      */
     if (bAHI_WatchdogResetEvent())
     {
         DBG_vPrintf(TRACE_APP, "APP: Watchdog timer has reset device!\n");
-        vAHI_WatchdogStop();
-        while (1);  // TODO
+        //vAHI_WatchdogStop();
+        //while (1);
     }
 
     /* Initialize ROM based software modules */

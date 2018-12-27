@@ -51,6 +51,10 @@
 #include "pdum_gen.h"
 #include "pdm_app_ids.h"
 
+#include "mcp3204.h"
+#include "ad8231.h"
+#include "ltc1661.h"
+
 /****************************************************************************/
 /***        Macro Definitions                                             ***/
 /****************************************************************************/
@@ -63,6 +67,18 @@
 
 #define NO_NETWORK_SLEEP_DUR        10   // seconds
 #define SECS_TO_TICKS( seconds )	seconds * 32768
+
+#define DIO17						17
+#define ENABLE_3VLN() 				vAHI_DioSetDirection(0x0,(1 << DIO17)); vAHI_DioSetOutput((1 << DIO17), 0x0);
+#define DISABLE_3VLN() 				vAHI_DioSetDirection(0x0,(1 << DIO17)); vAHI_DioSetOutput(0x0, (1 << DIO17));
+
+#define DIO12						12
+#define ENABLE_POWERSAVE() 			vAHI_DioSetDirection(0x0,(1 << DIO12)); vAHI_DioSetOutput(0x0, (1 << DIO12));
+#define DISABLE_POWERSAVE() 		vAHI_DioSetDirection(0x0,(1 << DIO12)); vAHI_DioSetOutput((1 << DIO12), 0x0);
+
+#define DIO11						11
+#define ENABLE_WB() 				vAHI_DioSetDirection(0x0,(1 << DIO11)); vAHI_DioSetOutput(0x0, (1 << DIO11));
+#define DISABLE_WB() 				vAHI_DioSetDirection(0x0,(1 << DIO11)); vAHI_DioSetOutput((1 << DIO11), 0x0);
 
 /****************************************************************************/
 /***        Type Definitions                                              ***/
@@ -148,7 +164,7 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
     s_network.rejoinStrikes = 0;
 
     s_eDevice.isConfigured = FALSE;
-    s_eDevice.samplePeriod = DEFAULT_SLEEP_TIME; //TODO: Create macro for this
+    s_eDevice.samplePeriod = DEFAULT_SAMPLE_PERIOD;
     s_eDevice.channelAValue = CHANNEL_A_DEFAULT_VALUE;
     s_eDevice.channelBValue = CHANNEL_B_DEFAULT_VALUE;
     s_eDevice.gainValue = GAIN_DEFAULT_VALUE;
@@ -181,6 +197,13 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
     /* If configured flag is set, then restore analog parameters */
     if(s_eDevice.isConfigured)
     {
+    	PDM_eReadDataFromRecord
+		(
+			PDM_APP_ID_SAMPLE_PERIOD,
+			&s_eDevice.samplePeriod,
+			sizeof(s_eDevice.samplePeriod),
+			&u16DataBytesRead
+		);
     	PDM_eReadDataFromRecord
 		(
 			PDM_APP_ID_CHANNEL_A,
@@ -219,14 +242,21 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
     DBG_vPrintf(TRACE_APP, "APP: Device Information:\n\r");
     DBG_vPrintf(TRACE_APP, "  MAC: 0x%016llx\n\r", ZPS_u64AplZdoGetIeeeAddr());
     DBG_vPrintf(TRACE_APP, "  EPID: 0x%016llx\n\r", s_network.currentEpid);
+    DBG_vPrintf(TRACE_APP, "  Sample Period: %d\n\r", s_eDevice.samplePeriod);
     DBG_vPrintf(TRACE_APP, "  Configured Flag: %d\n\r", s_eDevice.isConfigured);
     DBG_vPrintf(TRACE_APP, "  Channel A: %d\n\r", s_eDevice.channelAValue);
     DBG_vPrintf(TRACE_APP, "  Channel B: %d\n\r", s_eDevice.channelBValue);
     DBG_vPrintf(TRACE_APP, "  Gain: %d\n\r", s_eDevice.gainValue);
 
-    /* Initialize other software modules
-     * HERE
-     */
+    /* Send DAC and OPAMP to low power */
+	ENABLE_3VLN();
+	ad8231_init();
+	ad8231_enable();
+	ltc1661_init();
+	ad8231_disable();
+	ltc1661_sleep();
+	ENABLE_POWERSAVE();
+	DISABLE_WB();
 
     /* Always initialize any peripherals used by the application
      * HERE
@@ -371,7 +401,6 @@ PUBLIC void APP_vtaskSleepingEndDevice()
 
         case HANDLE_DATA_STATE:
         {
-        	//TODO: Handle data
         	/* check if any messages to collect */
 			if ( ZQ_bQueueReceive(&APP_msgStrainGaugeEvents, &sStackEvent))
 			{
@@ -446,19 +475,173 @@ PUBLIC void APP_vtaskSleepingEndDevice()
         case READ_SENSOR_STATE:
         {
         	DBG_vPrintf(TRACE_APP, "\n\rAPP: SEND_DATA_STATE\n\r");
-        	s_eDevice.currentState = SEND_DATA_STATE;
+
+        	static int results[10];
+        	int i, j, Imin, temp;
+        	uint16 byteCount;
+        	PDUM_teStatus status;
+
+        	/* Enable peripherals for sensing */
+        	DISABLE_POWERSAVE();
+			ENABLE_WB();
+			ad8231_init();
+			ad8231_enable();
+			ad8231_setGain(s_eDevice.gainValue);
+			ltc1661_init();
+			ltc1661_setDAC_A(s_eDevice.channelAValue);
+			ltc1661_setDAC_B(s_eDevice.channelBValue);
+
+			/* Start ADC Conversion */
+			MCP3204_init(0);
+
+			for (i = 0; i < 10; i++) results[i] = MCP3204_convert(0, 2);
+
+			for(i = 0; i < 10-1; i++)
+			{
+				Imin = i;
+				for(j = i + 1; j < 10; j++)
+				{
+					if(results[j] < results[Imin])
+					{
+						Imin = j;
+					}
+				}
+				temp = results[Imin];
+				results[Imin] = results[i];
+				results[i] = temp;
+			}
+
+			/* Low power Config */
+			ad8231_disable();
+			ltc1661_sleep();
+			DISABLE_WB();
+			ENABLE_POWERSAVE();
+
+			DBG_vPrintf(TRACE_APP, "  APP: sorted Values = ");
+			for (i = 0; i < 10; i++) DBG_vPrintf(TRACE_APP,"%d, ", results[i]);
+			DBG_vPrintf(TRACE_APP, "\n\r");
+
+			s_eDevice.sensorValue = results[3];
+			s_eDevice.sensorValue += results[4];
+			s_eDevice.sensorValue += results[5];
+			s_eDevice.sensorValue /= 3;
+
+			s_eDevice.temperatureValue = MCP3204_convert(0, 1);
+			s_eDevice.batteryLevel = MCP3204_convert(0, 0);
+
+			DBG_vPrintf(TRACE_APP, "  APP: sensorValue = %d\n\r", s_eDevice.sensorValue);
+			DBG_vPrintf(TRACE_APP, "  APP: temperatureValue = %d\n\r", s_eDevice.temperatureValue);
+			DBG_vPrintf(TRACE_APP, "  APP: batteryValue = %d\n\r", s_eDevice.batteryLevel);
+
+			DBG_vPrintf(TRACE_APP, "  APP: Sending data to Coordinator\n\r");
+			/* Allocate memory for APDU buffer with preconfigured "type" */
+			PDUM_thAPduInstance data = PDUM_hAPduAllocateAPduInstance(apduMyData);
+			if(data == PDUM_INVALID_HANDLE)
+			{
+				/* Problem allocating APDU instance memory */
+				DBG_vPrintf(TRACE_APP, "  APP: Unable to allocate APDU memory\n\r");
+				//TODO: Handle error
+			}
+			else
+			{
+				/* Load payload data into APDU */
+				byteCount = PDUM_u16APduInstanceWriteNBO
+				(
+					data,	// APDU instance handle
+					0,		// APDU position for data
+					"bhhh",	// data format string
+					'*',
+					s_eDevice.sensorValue,
+					s_eDevice.temperatureValue,
+					s_eDevice.batteryLevel
+				);
+
+				if( byteCount == 0 )
+				{
+					/* No data was written to the APDU instance */
+					DBG_vPrintf(TRACE_APP, "  APP: No data written to APDU\n\r");
+					//TODO: Handle error
+				}
+				else
+				{
+					PDUM_eAPduInstanceSetPayloadSize(data, byteCount);
+					DBG_vPrintf(TRACE_APP, "  APP: Data written to APDU: %d\n\r", byteCount);
+
+					/* Request data send to destination */
+					status = ZPS_eAplAfUnicastDataReq
+					(
+						data,					// APDU instance handle
+						0xFFFF,					// cluster ID
+						1,						// source endpoint
+						1,						// destination endpoint
+						0x0000,					// destination network address
+						ZPS_E_APL_AF_UNSECURE,	// security mode
+						0,						// radius
+						NULL					// sequence number pointer
+					);
+
+					if( status != ZPS_E_SUCCESS )
+					{
+						/* Problem with request */
+						DBG_vPrintf(TRACE_APP, "  APP: AckDataReq not successful, status = %d\n\r", status);
+						//TODO: Add strike count and handle error
+					}
+
+					/* everything OK, now we wait for ZPS_EVENT_APS_DATA_CONFIRM */
+					DBG_vPrintf(TRACE_APP, "\n\rAPP: SEND_DATA_STATE\n\r");
+					s_eDevice.currentState = SEND_DATA_STATE;
+					break;
+				}
+			}
+        	s_eDevice.currentState = PREP_TO_SLEEP_STATE;
         }
         break;
 
         case SEND_DATA_STATE:
         {
-        	s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+        	/* check if any messages to collect */
+			if ( ZQ_bQueueReceive(&APP_msgStrainGaugeEvents, &sStackEvent))
+			{
+				DBG_vPrintf(TRACE_APP, "  APP: New event in the stack\n\r");
+			}
+
+			switch (sStackEvent.eType)
+			{
+				case ZPS_EVENT_NONE: break;
+
+				case ZPS_EVENT_APS_DATA_CONFIRM:
+				{
+					/* Acknowledge data was sent */
+					DBG_vPrintf
+					(
+						TRACE_APP,
+						"  NWK: event ZPS_EVENT_APS_DATA_CONFIRM, status = %d, Address = 0x%04x\n",
+						sStackEvent.uEvent.sApsDataConfirmEvent.u8Status,
+						sStackEvent.uEvent.sApsDataConfirmEvent.uDstAddr.u16Addr
+					);
+
+					s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+				}
+				break;
+
+				default:
+				{
+					DBG_vPrintf(TRACE_APP, "  NWK: unhandled event %d\n", sStackEvent.eType);
+					s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+					//TODO: Handle Error
+				}
+				break;
+			}
         }
         break;
 
         case PREP_TO_SLEEP_STATE:
         {
         	DBG_vPrintf(TRACE_APP, "\n\rAPP: PREP_TO_SLEEP_STATE\n\r");
+
+			if(s_eDevice.isConfigured && s_network.isConnected)
+				s_eDevice.sleepTime = s_eDevice.samplePeriod;
+			else s_eDevice.sleepTime = DEFAULT_SLEEP_TIME;
 
         	DBG_vPrintf
 			(
@@ -476,7 +659,6 @@ PUBLIC void APP_vtaskSleepingEndDevice()
 			);
 
         	s_eDevice.currentState = SLEEP_STATE;
-
         }
         break;
 
