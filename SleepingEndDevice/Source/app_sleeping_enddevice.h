@@ -72,6 +72,14 @@ typedef enum
     WAKE_UP_STATE
 } sleepingEndDeviceStates_t;
 
+typedef enum
+{
+    FRAME_SUCCESS,
+    FRAME_BAD_SIZE,
+    FRAME_BAD_FORMAT,
+    FRAME_UNK_ERROR,
+} frameReturnValues_t;
+
 typedef struct
 {
 	bool						isConfigured;

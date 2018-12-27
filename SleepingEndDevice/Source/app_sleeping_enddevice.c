@@ -83,7 +83,7 @@ typedef struct
 /****************************************************************************/
 
 PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent);
-PRIVATE void vHandleIncomingFrame(ZPS_tsAfEvent sStackEvent);
+PRIVATE frameReturnValues_t vHandleIncomingFrame(ZPS_tsAfEvent sStackEvent);
 
 /****************************************************************************/
 /***        Exported Variables                                            ***/
@@ -260,6 +260,8 @@ PUBLIC void APP_vtaskSleepingEndDevice()
     /* Check if there is any event on the stack */
     ZQ_bQueueReceive(&APP_msgZpsEvents, &sStackEvent);
 
+    //TODO: Implement a watchdog for the state machine
+
     switch (s_eDevice.currentState)
     {
         case NETWORK_STATE:
@@ -301,7 +303,16 @@ PUBLIC void APP_vtaskSleepingEndDevice()
 				if(eStatus == MAC_ENUM_NO_DATA)
 				{
 					DBG_vPrintf(TRACE_APP,"  NWK: No new Data\n\r");
-					s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+
+					if(s_eDevice.isConfigured)
+					{
+						DBG_vPrintf(TRACE_APP, "\n\rAPP: READ_SENSOR_STATE\n\r");
+						s_eDevice.currentState = READ_SENSOR_STATE;
+					}
+					else
+					{
+						s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+					}
 				}
 				/* New Data */
 				else if(eStatus == MAC_ENUM_SUCCESS)
@@ -355,9 +366,6 @@ PUBLIC void APP_vtaskSleepingEndDevice()
         		s_eDevice.currentState = PREP_TO_SLEEP_STATE;
         		//TODO: Handle error
         	}
-
-			break;
-
         }
         break;
 
@@ -367,33 +375,16 @@ PUBLIC void APP_vtaskSleepingEndDevice()
         	/* check if any messages to collect */
 			if ( ZQ_bQueueReceive(&APP_msgStrainGaugeEvents, &sStackEvent))
 			{
-				DBG_vPrintf(TRACE_APP, "APP: New event in the stack\n\r");
+				DBG_vPrintf(TRACE_APP, "  APP: New event in the stack\n\r");
 			}
 
 			switch (sStackEvent.eType)
 			{
-				case ZPS_EVENT_NONE:
-				break;
-				case ZPS_EVENT_APS_INTERPAN_DATA_INDICATION:
-				{
-					 DBG_vPrintf(TRACE_APP, "  NWK: event ZPS_EVENT_APS_INTERPAN_DATA_INDICATION\n");
-					 PDUM_eAPduFreeAPduInstance(sStackEvent.uEvent.sApsInterPanDataIndEvent.hAPduInst);
-				}
-				break;
-
-				case ZPS_EVENT_APS_ZGP_DATA_INDICATION:
-				{
-					DBG_vPrintf(TRACE_APP, "  NWK: event ZPS_EVENT_APS_ZGP_DATA_INDICATION\n");
-					if (sStackEvent.uEvent.sApsZgpDataIndEvent.hAPduInst)
-					{
-						PDUM_eAPduFreeAPduInstance(sStackEvent.uEvent.sApsZgpDataIndEvent.hAPduInst);
-					}
-				}
-				break;
+				case ZPS_EVENT_NONE: break;
 
 				case ZPS_EVENT_APS_DATA_INDICATION:
 				{
-					DBG_vPrintf(TRACE_APP, "  NWK: event ZPS_EVENT_AF_DATA_INDICATION\n");
+					DBG_vPrintf(TRACE_APP, "  NWK: ZPS_EVENT_APS_DATA_INDICATION\n");
 
 					/* Process incoming cluster messages for this endpoint... */
 					DBG_vPrintf(TRACE_APP, "  Data Indication:\r\n");
@@ -403,7 +394,14 @@ PUBLIC void APP_vtaskSleepingEndDevice()
 					DBG_vPrintf(TRACE_APP, "    EndPoint:%x\r\n",sStackEvent.uEvent.sApsDataIndEvent.u8DstEndpoint);
 					DBG_vPrintf(TRACE_APP, "    LQI     :%d\r\n",sStackEvent.uEvent.sApsDataIndEvent.u8LinkQuality);
 
-					vHandleIncomingFrame(sStackEvent);
+					uint8 status = vHandleIncomingFrame(sStackEvent);
+
+					if (status != FRAME_SUCCESS)
+					{
+						DBG_vPrintf(TRACE_APP, "  APP: Frame processing error, status = %d\n\r", status);
+						s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+						//TODO: Handle Frame ERROR
+					}
 
 					/* free the application protocol data unit (APDU) once it has been dealt with */
 					PDUM_eAPduFreeAPduInstance(sStackEvent.uEvent.sApsDataIndEvent.hAPduInst);
@@ -412,40 +410,49 @@ PUBLIC void APP_vtaskSleepingEndDevice()
 
 				case ZPS_EVENT_APS_DATA_CONFIRM:
 				{
-					DBG_vPrintf(TRACE_APP, "  NWK: event ZPS_EVENT_APS_DATA_CONFIRM Status %d, Address 0x%04x\n",
-								sStackEvent.uEvent.sApsDataConfirmEvent.u8Status,
-								sStackEvent.uEvent.sApsDataConfirmEvent.uDstAddr.u16Addr);
-				}
-				break;
+					/* Acknowledge data was sent */
+					DBG_vPrintf
+					(
+						TRACE_APP,
+						"  NWK: event ZPS_EVENT_APS_DATA_CONFIRM, status = %d, Address = 0x%04x\n",
+						sStackEvent.uEvent.sApsDataConfirmEvent.u8Status,
+						sStackEvent.uEvent.sApsDataConfirmEvent.uDstAddr.u16Addr
+					);
 
-				case ZPS_EVENT_APS_DATA_ACK:
-				{
-					DBG_vPrintf(TRACE_APP, "  NWK: event ZPS_EVENT_APS_DATA_ACK Status %d, Address 0x%04x\n",
-								sStackEvent.uEvent.sApsDataAckEvent.u8Status,
-								sStackEvent.uEvent.sApsDataAckEvent.u16DstAddr);
+					if(s_eDevice.isConfigured)
+					{
+						DBG_vPrintf(TRACE_APP, "\n\rAPP: READ_SENSOR_STATE\n\r");
+						s_eDevice.currentState = READ_SENSOR_STATE;
+					}
+					else
+					{
+						s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+					}
+
 				}
 				break;
 
 				default:
 				{
 					DBG_vPrintf(TRACE_APP, "  NWK: unhandled event %d\n", sStackEvent.eType);
+					s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+					//TODO: Handle Error
 				}
 				break;
 			}
-			//TODO: Change this
-			s_eDevice.currentState = PREP_TO_SLEEP_STATE;
         }
         break;
 
         case READ_SENSOR_STATE:
         {
-
+        	DBG_vPrintf(TRACE_APP, "\n\rAPP: SEND_DATA_STATE\n\r");
+        	s_eDevice.currentState = SEND_DATA_STATE;
         }
         break;
 
         case SEND_DATA_STATE:
         {
-
+        	s_eDevice.currentState = PREP_TO_SLEEP_STATE;
         }
         break;
 
@@ -838,10 +845,12 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
  * void
  *
  ****************************************************************************/
-PRIVATE void vHandleIncomingFrame(ZPS_tsAfEvent sStackEvent)
+PRIVATE frameReturnValues_t vHandleIncomingFrame(ZPS_tsAfEvent sStackEvent)
 {
 	uint8 idByte = 0;
 	uint16 byteCount;
+	uint8 status;
+	PDM_teStatus pdmStatus;
 
 	byteCount = PDUM_u16APduInstanceReadNBO
 	(
@@ -855,8 +864,7 @@ PRIVATE void vHandleIncomingFrame(ZPS_tsAfEvent sStackEvent)
 	if(byteCount == 0)
 	{
 		DBG_vPrintf(TRACE_APP, "  APP: Frame error, size = 0\n\r");
-		//TODO: Handle error
-		return;
+		return FRAME_BAD_SIZE;
 	}
 
 	switch(idByte)
@@ -886,8 +894,7 @@ PRIVATE void vHandleIncomingFrame(ZPS_tsAfEvent sStackEvent)
 			if(byteCount != 8)
 			{
 				DBG_vPrintf(TRACE_APP, "  APP: Frame error, size = %d\r\n", byteCount);
-				//TODO: Handle error
-				return;
+				return FRAME_BAD_SIZE;
 			}
 			/* size OK */
 			else
@@ -904,26 +911,26 @@ PRIVATE void vHandleIncomingFrame(ZPS_tsAfEvent sStackEvent)
 				DBG_vPrintf(TRACE_APP, "    gainValue = 0x%04x\n", s_eDevice.gainValue);
 
 				/* Store parameters in flash */
-				PDM_teStatus status;
-				status = PDM_eSaveRecordData(PDM_APP_ID_SAMPLE_PERIOD, &s_eDevice.samplePeriod, sizeof(s_eDevice.samplePeriod));
-				if(status != PDM_E_STATUS_OK) DBG_vPrintf(TRACE_APP, "  APP: PDM_APP_ID_SAMPLE_PERIOD save error, status = %d\n", status);
+				pdmStatus = PDM_eSaveRecordData(PDM_APP_ID_SAMPLE_PERIOD, &s_eDevice.samplePeriod, sizeof(s_eDevice.samplePeriod));
+				if(pdmStatus != PDM_E_STATUS_OK) DBG_vPrintf(TRACE_APP, "  APP: PDM_APP_ID_SAMPLE_PERIOD save error, status = %d\n", pdmStatus);
 
-				status = PDM_eSaveRecordData(PDM_APP_ID_CHANNEL_A, &s_eDevice.channelAValue, sizeof(s_eDevice.channelAValue));
-				if(status != PDM_E_STATUS_OK) DBG_vPrintf(TRACE_APP, "  APP: PDM_APP_ID_CHANNEL_A save error, status = %d\n", status);
+				pdmStatus = PDM_eSaveRecordData(PDM_APP_ID_CHANNEL_A, &s_eDevice.channelAValue, sizeof(s_eDevice.channelAValue));
+				if(pdmStatus != PDM_E_STATUS_OK) DBG_vPrintf(TRACE_APP, "  APP: PDM_APP_ID_CHANNEL_A save error, status = %d\n", pdmStatus);
 
-				status = PDM_eSaveRecordData(PDM_APP_ID_CHANNEL_B, &s_eDevice.channelBValue, sizeof(s_eDevice.channelBValue));
-				if(status != PDM_E_STATUS_OK) DBG_vPrintf(TRACE_APP, "  APP: PDM_APP_ID_CHANNEL_B save error, status = %d\n", status);
+				pdmStatus = PDM_eSaveRecordData(PDM_APP_ID_CHANNEL_B, &s_eDevice.channelBValue, sizeof(s_eDevice.channelBValue));
+				if(pdmStatus != PDM_E_STATUS_OK) DBG_vPrintf(TRACE_APP, "  APP: PDM_APP_ID_CHANNEL_B save error, status = %d\n", pdmStatus);
 
-				status = PDM_eSaveRecordData(PDM_APP_ID_GAIN, &s_eDevice.gainValue, sizeof(s_eDevice.gainValue));
-				if(status != PDM_E_STATUS_OK) DBG_vPrintf(TRACE_APP, "  APP: PDM_APP_ID_GAIN save error, status = %d\n", status);
+				pdmStatus = PDM_eSaveRecordData(PDM_APP_ID_GAIN, &s_eDevice.gainValue, sizeof(s_eDevice.gainValue));
+				if(pdmStatus != PDM_E_STATUS_OK) DBG_vPrintf(TRACE_APP, "  APP: PDM_APP_ID_GAIN save error, status = %d\n", pdmStatus);
 
+				DBG_vPrintf(TRACE_APP, "  APP: Sending response to Coordinator\n\r");
 				/* Allocate memory for APDU buffer with preconfigured "type" */
 				PDUM_thAPduInstance data = PDUM_hAPduAllocateAPduInstance(apduMyData);
 				if(data == PDUM_INVALID_HANDLE)
 				{
 					/* Problem allocating APDU instance memory */
-					DBG_vPrintf(TRACE_APP, "  APP: Unable to allocate APDU memory\n");
-					//TODO: Handle error
+					DBG_vPrintf(TRACE_APP, "  APP: Unable to allocate APDU memory\n\r");
+					return FRAME_UNK_ERROR;
 				}
 				else
 				{
@@ -943,13 +950,13 @@ PRIVATE void vHandleIncomingFrame(ZPS_tsAfEvent sStackEvent)
 					if( byteCount == 0 )
 					{
 						/* No data was written to the APDU instance */
-						DBG_vPrintf(TRACE_APP, "  APP: No data written to APDU\n");
-						//TODO: Handle error
+						DBG_vPrintf(TRACE_APP, "  APP: No data written to APDU\n\r");
+						return FRAME_UNK_ERROR;
 					}
 					else
 					{
 						PDUM_eAPduInstanceSetPayloadSize(data, byteCount);
-						DBG_vPrintf(TRACE_APP, "  APP: Data written to APDU: %d\n", byteCount);
+						DBG_vPrintf(TRACE_APP, "  APP: Data written to APDU: %d\n\r", byteCount);
 
 						/* Request data send to destination */
 						status = ZPS_eAplAfUnicastDataReq
@@ -968,8 +975,12 @@ PRIVATE void vHandleIncomingFrame(ZPS_tsAfEvent sStackEvent)
 						{
 							/* Problem with request */
 							DBG_vPrintf(TRACE_APP, "  APP: AckDataReq not successful, status = %d\n\r", status);
+							return FRAME_UNK_ERROR;
 							//TODO: Add strike count and handle error
 						}
+
+						/* everything OK, now we wait for ZPS_EVENT_APS_DATA_CONFIRM */
+						return FRAME_SUCCESS;
 					}
 				}
 			}
@@ -980,6 +991,71 @@ PRIVATE void vHandleIncomingFrame(ZPS_tsAfEvent sStackEvent)
 		case '$':
 		{
 			DBG_vPrintf(TRACE_APP, "  APP: GO command frame\n\r");
+
+			s_eDevice.isConfigured = TRUE;
+
+			/* Save configured flag in flash */
+			pdmStatus = PDM_eSaveRecordData(PDM_APP_ID_CONFIGURED, &s_eDevice.isConfigured, sizeof(s_eDevice.isConfigured));
+			if(pdmStatus != PDM_E_STATUS_OK) DBG_vPrintf(TRACE_APP, "  APP: PDM_APP_ID_CONFIGURED save error, status = %d\n", pdmStatus);
+
+			DBG_vPrintf(TRACE_APP, "  APP: Sending response to Coordinator\n\r");
+			/* Allocate memory for APDU buffer with preconfigured "type" */
+			PDUM_thAPduInstance data = PDUM_hAPduAllocateAPduInstance(apduMyData);
+			if(data == PDUM_INVALID_HANDLE)
+			{
+				/* Problem allocating APDU instance memory */
+				DBG_vPrintf(TRACE_APP, "  APP: Unable to allocate APDU memory\n\r");
+				return FRAME_UNK_ERROR;
+			}
+			else
+			{
+				/* Load payload data into APDU */
+				byteCount = PDUM_u16APduInstanceWriteNBO
+				(
+					data,	// APDU instance handle
+					0,		// APDU position for data
+					"bbb",	// data format string
+					'$',
+					'G',
+					'O'
+				);
+
+				if( byteCount == 0 )
+				{
+					/* No data was written to the APDU instance */
+					DBG_vPrintf(TRACE_APP, "  APP: No data written to APDU\n\r");
+					return FRAME_UNK_ERROR;
+				}
+				else
+				{
+					PDUM_eAPduInstanceSetPayloadSize(data, byteCount);
+					DBG_vPrintf(TRACE_APP, "  APP: Data written to APDU: %d\n\r", byteCount);
+
+					/* Request data send to destination */
+					status = ZPS_eAplAfUnicastDataReq
+					(
+						data,					// APDU instance handle
+						0xFFFF,					// cluster ID
+						1,						// source endpoint
+						1,						// destination endpoint
+						0x0000,					// destination network address
+						ZPS_E_APL_AF_UNSECURE,	// security mode
+						0,						// radius
+						NULL					// sequence number pointer
+					);
+
+					if( status != ZPS_E_SUCCESS )
+					{
+						/* Problem with request */
+						DBG_vPrintf(TRACE_APP, "  APP: AckDataReq not successful, status = %d\n\r", status);
+						return FRAME_UNK_ERROR;
+						//TODO: Add strike count and handle error
+					}
+
+					/* everything OK, now we wait for ZPS_EVENT_APS_DATA_CONFIRM */
+					return FRAME_SUCCESS;
+				}
+			}
 		}
 		break;
 
@@ -987,9 +1063,75 @@ PRIVATE void vHandleIncomingFrame(ZPS_tsAfEvent sStackEvent)
 		case '&':
 		{
 			DBG_vPrintf(TRACE_APP, "  APP: Broadcast request frame\n\r");
+
+			/* Allocate memory for APDU buffer with preconfigured "type" */
+			PDUM_thAPduInstance data = PDUM_hAPduAllocateAPduInstance(apduMyData);
+			if(data == PDUM_INVALID_HANDLE)
+			{
+				/* Problem allocating APDU instance memory */
+				DBG_vPrintf(TRACE_APP, "  APP: Unable to allocate APDU memory\n\r");
+				return FRAME_UNK_ERROR;
+			}
+			else
+			{
+				DBG_vPrintf(TRACE_APP, "  APP: Sending response to Coordinator\n\r");
+				/* Load payload data into APDU */
+				byteCount = PDUM_u16APduInstanceWriteNBO
+				(
+					data,	// APDU instance handle
+					0,		// APDU position for data
+					"b",	// data format string
+					'&'
+				);
+
+				if( byteCount == 0 )
+				{
+					/* No data was written to the APDU instance */
+					DBG_vPrintf(TRACE_APP, "  APP: No data written to APDU\n\r");
+					return FRAME_UNK_ERROR;
+				}
+				else
+				{
+					PDUM_eAPduInstanceSetPayloadSize(data, byteCount);
+					DBG_vPrintf(TRACE_APP, "  APP: Data written to APDU: %d\n\r", byteCount);
+
+					/* Request data send to destination */
+					status = ZPS_eAplAfUnicastDataReq
+					(
+						data,					// APDU instance handle
+						0xFFFF,					// cluster ID
+						1,						// source endpoint
+						1,						// destination endpoint
+						0x0000,					// destination network address
+						ZPS_E_APL_AF_UNSECURE,	// security mode
+						0,						// radius
+						NULL					// sequence number pointer
+					);
+
+					if( status != ZPS_E_SUCCESS )
+					{
+						/* Problem with request */
+						DBG_vPrintf(TRACE_APP, "  APP: AckDataReq not successful, status = %d\n\r", status);
+						return FRAME_UNK_ERROR;
+						//TODO: Add strike count and handle error
+					}
+
+					/* everything OK, now we wait for ZPS_EVENT_APS_DATA_CONFIRM */
+					return FRAME_SUCCESS;
+				}
+			}
+		}
+		break;
+
+		default:
+		{
+			DBG_vPrintf(TRACE_APP, "  APP: Frame format error\n\r");
+			return FRAME_BAD_FORMAT;
 		}
 		break;
 	}
+	DBG_vPrintf(TRACE_APP, "  APP: Frame unknown error\n\r");
+	return FRAME_UNK_ERROR;
 }
 
 /****************************************************************************
