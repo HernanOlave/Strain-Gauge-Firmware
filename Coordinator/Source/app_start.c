@@ -177,7 +177,7 @@ PUBLIC void vAppMain(void)
 	if( !success )
 	{
 		DBG_vPrintf(TRACE_APP, "APP: UART1 Init Failure\n");
-		while( TRUE );  // TODO (for testing only, remove for production)
+		//TODO: Handle error
 	}
 
 	vAHI_UartSetBaudRate( E_AHI_UART_1, E_AHI_UART_RATE_115200 );

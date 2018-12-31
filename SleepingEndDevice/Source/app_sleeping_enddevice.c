@@ -121,6 +121,8 @@ PRIVATE networkDesc_t s_network;
 tszQueue APP_msgStrainGaugeEvents;
 tszQueue APP_msgZpsEvents;
 
+uint32 timeout;
+
 /****************************************************************************/
 /***        Exported Functions                                            ***/
 /****************************************************************************/
@@ -172,6 +174,8 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
     s_eDevice.channelBValue = CHANNEL_B_DEFAULT_VALUE;
     s_eDevice.gainValue = GAIN_DEFAULT_VALUE;
     s_eDevice.sleepTime = DEFAULT_SLEEP_TIME;
+
+    timeout = 0;
 
     /* Restore any application data previously saved to flash
      * All Application records must be loaded before the call to
@@ -292,6 +296,21 @@ PUBLIC void APP_vtaskSleepingEndDevice()
 
     /* Check if there is any event on the stack */
     ZQ_bQueueReceive(&APP_msgZpsEvents, &sStackEvent);
+
+    if(s_eDevice.currentState != s_eDevice.previousState)
+    {
+    	timeout = 0;
+    	s_eDevice.previousState = s_eDevice.currentState;
+    }
+    else
+    {
+    	timeout++;
+    	if (timeout >= SECS_TO_TICKS(5))
+    	{
+    		DBG_vPrintf(TRACE_APP, "APP: State machine timed out\n\r");
+    		vAHI_SwReset();
+    	}
+    }
 
     //TODO: Implement a watchdog for the state machine
 
