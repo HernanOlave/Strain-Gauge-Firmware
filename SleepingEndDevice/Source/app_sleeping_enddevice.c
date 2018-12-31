@@ -102,6 +102,7 @@ typedef struct
 
 PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent);
 PRIVATE frameReturnValues_t vHandleIncomingFrame(ZPS_tsAfEvent sStackEvent);
+PRIVATE void sendBroadcast(void);
 
 /****************************************************************************/
 /***        Exported Variables                                            ***/
@@ -901,6 +902,8 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 
 				//TODO: Request AUTH and go to AUTH State
 				s_network.isConnected = TRUE;
+
+				sendBroadcast();
 			}
 
 			/* Node failed to join */
@@ -959,6 +962,8 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 
 				/* Device reconnected successfully */
 				s_network.isConnected = TRUE;
+
+				sendBroadcast();
 			}
 
 			/* Node failed rejoin */
@@ -1247,63 +1252,7 @@ PRIVATE frameReturnValues_t vHandleIncomingFrame(ZPS_tsAfEvent sStackEvent)
 		case '&':
 		{
 			DBG_vPrintf(TRACE_APP, "  APP: Broadcast request frame\n\r");
-
-			/* Allocate memory for APDU buffer with preconfigured "type" */
-			PDUM_thAPduInstance data = PDUM_hAPduAllocateAPduInstance(apduMyData);
-			if(data == PDUM_INVALID_HANDLE)
-			{
-				/* Problem allocating APDU instance memory */
-				DBG_vPrintf(TRACE_APP, "  APP: Unable to allocate APDU memory\n\r");
-				return FRAME_UNK_ERROR;
-			}
-			else
-			{
-				DBG_vPrintf(TRACE_APP, "  APP: Sending response to Coordinator\n\r");
-				/* Load payload data into APDU */
-				byteCount = PDUM_u16APduInstanceWriteNBO
-				(
-					data,	// APDU instance handle
-					0,		// APDU position for data
-					"b",	// data format string
-					'&'
-				);
-
-				if( byteCount == 0 )
-				{
-					/* No data was written to the APDU instance */
-					DBG_vPrintf(TRACE_APP, "  APP: No data written to APDU\n\r");
-					return FRAME_UNK_ERROR;
-				}
-				else
-				{
-					PDUM_eAPduInstanceSetPayloadSize(data, byteCount);
-					DBG_vPrintf(TRACE_APP, "  APP: Data written to APDU: %d\n\r", byteCount);
-
-					/* Request data send to destination */
-					status = ZPS_eAplAfUnicastDataReq
-					(
-						data,					// APDU instance handle
-						0xFFFF,					// cluster ID
-						1,						// source endpoint
-						1,						// destination endpoint
-						0x0000,					// destination network address
-						ZPS_E_APL_AF_UNSECURE,	// security mode
-						0,						// radius
-						NULL					// sequence number pointer
-					);
-
-					if( status != ZPS_E_SUCCESS )
-					{
-						/* Problem with request */
-						DBG_vPrintf(TRACE_APP, "  APP: AckDataReq not successful, status = %d\n\r", status);
-						return FRAME_UNK_ERROR;
-						//TODO: Add strike count and handle error
-					}
-
-					/* everything OK, now we wait for ZPS_EVENT_APS_DATA_CONFIRM */
-					return FRAME_SUCCESS;
-				}
-			}
+			sendBroadcast();
 		}
 		break;
 
@@ -1316,6 +1265,77 @@ PRIVATE frameReturnValues_t vHandleIncomingFrame(ZPS_tsAfEvent sStackEvent)
 	}
 	DBG_vPrintf(TRACE_APP, "  APP: Frame unknown error\n\r");
 	return FRAME_UNK_ERROR;
+}
+
+/****************************************************************************
+ *
+ * NAME: sendBroadcast
+ *
+ * DESCRIPTION:
+ * Sends a broadcast message (&) to the coordinator
+ *
+ * RETURNS:
+ * void
+ *
+ ****************************************************************************/
+PRIVATE void sendBroadcast(void)
+{
+	uint16 byteCount, status;
+
+	/* Allocate memory for APDU buffer with preconfigured "type" */
+	PDUM_thAPduInstance data = PDUM_hAPduAllocateAPduInstance(apduMyData);
+	if(data == PDUM_INVALID_HANDLE)
+	{
+		/* Problem allocating APDU instance memory */
+		DBG_vPrintf(TRACE_APP, "  APP: Unable to allocate APDU memory\n\r");
+		//TODO: Handle error
+	}
+	else
+	{
+		DBG_vPrintf(TRACE_APP, "  APP: Sending response to Coordinator\n\r");
+		/* Load payload data into APDU */
+		byteCount = PDUM_u16APduInstanceWriteNBO
+		(
+			data,	// APDU instance handle
+			0,		// APDU position for data
+			"b",	// data format string
+			'&'
+		);
+
+		if( byteCount == 0 )
+		{
+			/* No data was written to the APDU instance */
+			DBG_vPrintf(TRACE_APP, "  APP: No data written to APDU\n\r");
+			//TODO: Handle error
+		}
+		else
+		{
+			PDUM_eAPduInstanceSetPayloadSize(data, byteCount);
+			DBG_vPrintf(TRACE_APP, "  APP: Data written to APDU: %d\n\r", byteCount);
+
+			/* Request data send to destination */
+			status = ZPS_eAplAfUnicastDataReq
+			(
+				data,					// APDU instance handle
+				0xFFFF,					// cluster ID
+				1,						// source endpoint
+				1,						// destination endpoint
+				0x0000,					// destination network address
+				ZPS_E_APL_AF_UNSECURE,	// security mode
+				0,						// radius
+				NULL					// sequence number pointer
+			);
+
+			if( status != ZPS_E_SUCCESS )
+			{
+				/* Problem with request */
+				DBG_vPrintf(TRACE_APP, "  APP: AckDataReq not successful, status = %d\n\r", status);
+				//TODO: Handle error
+			}
+
+			/* everything OK, now we wait for ZPS_EVENT_APS_DATA_CONFIRM */
+		}
+	}
 }
 
 /****************************************************************************
