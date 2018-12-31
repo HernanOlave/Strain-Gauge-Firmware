@@ -68,6 +68,8 @@
 #define NO_NETWORK_SLEEP_DUR        10   // seconds
 #define SECS_TO_TICKS( seconds )	seconds * 32768
 
+#define CONFIG_BUTTON_PIN			13
+
 #define DIO17						17
 #define ENABLE_3VLN() 				vAHI_DioSetDirection(0x0,(1 << DIO17)); vAHI_DioSetOutput((1 << DIO17), 0x0);
 #define DISABLE_3VLN() 				vAHI_DioSetDirection(0x0,(1 << DIO17)); vAHI_DioSetOutput(0x0, (1 << DIO17));
@@ -144,13 +146,13 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
 {
 	DBG_vPrintf(TRACE_APP, "APP: Startup\n\r");
 
-    bool_t bDeleteRecords = FALSE;
+    vAHI_DioSetDirection((1 << CONFIG_BUTTON_PIN), 0x0);	// set as input (default)
+    vAHI_DioSetPullup((1 << CONFIG_BUTTON_PIN), 0x0);		// enable pull-up (default)
 
     /* Delete the network context from flash if a button is being held down
      * at reset
      */
-    //TODO: Implement this feature
-    if (bDeleteRecords)
+    if (!((1 << CONFIG_BUTTON_PIN) & u32AHI_DioReadInput()))
     {
         DBG_vPrintf(TRACE_APP, "APP: Deleting all records from flash\n\r");
         PDM_vDeleteAllDataRecords();

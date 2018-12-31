@@ -73,8 +73,6 @@
 #define APP_QUEUE_SIZE               2
 #define MCPS_DCFM_QUEUE_SIZE         8
 
-#define DIO13    					13
-
 /****************************************************************************/
 /***        Local Function Prototypes                                     ***/
 /****************************************************************************/
@@ -169,14 +167,6 @@ PUBLIC void vAppMain(void)
     APP_vInitResources();
     APP_vSetUpHardware();
     vInitialiseApp();
-
-
-    // initialize Config input
-    vAHI_DioSetDirection((1 << DIO13), 0x0);	// set DIO0 as input (default)
-    vAHI_DioSetPullup((1 << DIO13), 0x0);		// enable DIO0 pull-up (default)
-    vAHI_DioWakeEdge( 0, (1 << DIO13));			// set DIO0 interrupt to falling edge
-    vAHI_DioWakeEnable((1 << DIO13), 0);		// enable DIO0 interrupt
-
 
     /* Define HIGH_POWER_ENABLE to enable high power module */
 #ifdef HIGH_POWER_ENABLE
@@ -279,13 +269,6 @@ PWRM_CALLBACK(Wakeup)
      * Do not use UART 1 if LEDs are used, as it shares DIO with the LEDS
      */
     DBG_vUartInit(DBG_E_UART_0, DBG_E_UART_BAUD_RATE_115200);
-
-    if( !((1 << DIO13) & u32AHI_DioReadInput()) )
-    {
-    	DBG_vPrintf(TRACE_APP, "APP: Config button pressed\n");
-        configPressed_sed = TRUE;
-		configPressed_ep  = TRUE;
-    }
 
     /* Restore Mac settings (turns radio on) */
     vMAC_RestoreSettings();
