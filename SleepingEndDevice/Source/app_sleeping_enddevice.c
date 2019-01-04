@@ -265,10 +265,6 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
 	ENABLE_POWERSAVE();
 	DISABLE_WB();
 
-    /* Always initialize any peripherals used by the application
-     * HERE
-     */
-
     /* Always start on NETWORK STATE */
     DBG_vPrintf(TRACE_APP, "\n\rAPP: NETWORK_STATE\n\r");
     s_eDevice.currentState = NETWORK_STATE;
@@ -294,9 +290,7 @@ PUBLIC void APP_vtaskSleepingEndDevice()
     ZPS_tsAfEvent sStackEvent;
     sStackEvent.eType = ZPS_EVENT_NONE;
 
-    /* Check if there is any event on the stack */
-    ZQ_bQueueReceive(&APP_msgZpsEvents, &sStackEvent);
-
+    /* State machine watchdog */
     if(s_eDevice.currentState != s_eDevice.previousState)
     {
     	timeout = 0;
@@ -305,133 +299,139 @@ PUBLIC void APP_vtaskSleepingEndDevice()
     else
     {
     	timeout++;
-    	if (timeout >= SECS_TO_TICKS(5))
+    	if (timeout >= 20000)
     	{
     		DBG_vPrintf(TRACE_APP, "APP: State machine timed out\n\r");
-    		vAHI_SwReset();
+    		s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+    		//vAHI_SwReset(); TODO: implement strikes then reset
     	}
     }
 
-    //TODO: Implement a watchdog for the state machine
-
+    /* Main State Machine */
     switch (s_eDevice.currentState)
     {
         case NETWORK_STATE:
         {
+        	/* Check if there is any event on the stack */
+			if (ZQ_bQueueReceive(&APP_msgZpsEvents, &sStackEvent))
+			{
+				DBG_vPrintf
+				(
+					TRACE_APP,
+					"  NWK: New event on the stack APP_msgZpsEvents = %d\n\r",
+					sStackEvent.eType
+				);
+			}
+
         	vHandleNetwork(sStackEvent);
 
         	if(s_network.isConnected)
         	{
         		DBG_vPrintf(TRACE_APP, "APP: Device is connected\n\r");
 
-        		/* Poll data from Stack */
-        		ZPS_eAplZdoPoll();
-
-        		DBG_vPrintf(TRACE_APP, "\n\rAPP: POLL_DATA_STATE\n\r");
-        		s_eDevice.currentState = POLL_DATA_STATE;
+        		DBG_vPrintf(TRACE_APP, "\n\rAPP: WAIT_CONFIRM_STATE\n\r");
+        		s_eDevice.currentState = WAIT_CONFIRM_STATE;
         	}
         }
         break;
 
         case POLL_DATA_STATE:
         {
-        	/* If there is no event breaks */
-        	if(sStackEvent.eType == ZPS_EVENT_NONE) break;
-
-        	/* Poll request completed */
-        	else if(sStackEvent.eType == ZPS_EVENT_NWK_POLL_CONFIRM)
+        	/* Check if there is any event on the stack */
+			if (ZQ_bQueueReceive(&APP_msgZpsEvents, &sStackEvent))
 			{
-        		uint8 eStatus;
-        		eStatus = sStackEvent.uEvent.sNwkPollConfirmEvent.u8Status;
-
 				DBG_vPrintf
 				(
 					TRACE_APP,
-					"  NWK: ZPS_EVENT_NEW_POLL_COMPLETE, status = %d\n\r",
-					eStatus
-				);
-
-				/* No new data */
-				if(eStatus == MAC_ENUM_NO_DATA)
-				{
-					DBG_vPrintf(TRACE_APP,"  NWK: No new Data\n\r");
-
-					if(s_eDevice.isConfigured)
-					{
-						DBG_vPrintf(TRACE_APP, "\n\rAPP: READ_SENSOR_STATE\n\r");
-						s_eDevice.currentState = READ_SENSOR_STATE;
-					}
-					else
-					{
-						s_eDevice.currentState = PREP_TO_SLEEP_STATE;
-					}
-				}
-				/* New Data */
-				else if(eStatus == MAC_ENUM_SUCCESS)
-				{
-					DBG_vPrintf(TRACE_APP,"  NWK: New Data\n\r");
-
-					DBG_vPrintf(TRACE_APP, "\n\rAPP: HANDLE_DATA_STATE\n\r");
-					s_eDevice.currentState = HANDLE_DATA_STATE;
-				}
-				else if(eStatus == MAC_ENUM_NO_ACK) /* No acknowledge */
-				{
-					/* add 1 strike */
-					s_network.noNwkStrikes++;
-					DBG_vPrintf
-					(
-						TRACE_APP,
-						"  NWK: No Acknowledge received, strike = %d\n\r",
-						s_network.noNwkStrikes
-					);
-
-					/* if 3 strikes node loses connection */
-					if(s_network.noNwkStrikes >= 3)
-					{
-						s_network.noNwkStrikes = 0;
-						s_network.isConnected = FALSE;
-						DBG_vPrintf(TRACE_APP,"  NWK: Connection lost\n\r");
-					}
-
-					s_eDevice.currentState = PREP_TO_SLEEP_STATE;
-				}
-				else /* unexpected status */
-				{
-					DBG_vPrintf
-					(
-						TRACE_APP,
-						"  NWK: Unexpected poll complete, status = %d\n\r",
-						eStatus
-					);
-					s_eDevice.currentState = PREP_TO_SLEEP_STATE;
-					//TODO: Hanlde error
-				}
-			}
-        	else /* unexpected event */
-        	{
-        		DBG_vPrintf
-				(
-					TRACE_APP,
-					"  NWK: Poll request unexpected event - %d\n\r",
+					"  NWK: New event on the stack APP_msgZpsEvents = %d\n\r",
 					sStackEvent.eType
 				);
-        		s_eDevice.currentState = PREP_TO_SLEEP_STATE;
-        		//TODO: Handle error
-        	}
-        }
-        break;
-
-        case HANDLE_DATA_STATE:
-        {
-        	/* check if any messages to collect */
-			if ( ZQ_bQueueReceive(&APP_msgStrainGaugeEvents, &sStackEvent))
-			{
-				DBG_vPrintf(TRACE_APP, "  APP: New event in the stack\n\r");
 			}
 
-			switch (sStackEvent.eType)
+			else if (ZQ_bQueueReceive(&APP_msgStrainGaugeEvents, &sStackEvent))
+			{
+				DBG_vPrintf
+				(
+					TRACE_APP,
+					"  NWK: New event on the stack APP_msgStrainGaugeEvents = %d\n\r",
+					sStackEvent.eType
+				);
+			}
+
+        	switch (sStackEvent.eType)
 			{
 				case ZPS_EVENT_NONE: break;
+
+				/* Poll request completed */
+				case ZPS_EVENT_NWK_POLL_CONFIRM:
+				{
+					uint8 eStatus;
+					eStatus = sStackEvent.uEvent.sNwkPollConfirmEvent.u8Status;
+
+					DBG_vPrintf
+					(
+						TRACE_APP,
+						"  NWK: ZPS_EVENT_NEW_POLL_COMPLETE, status = %d\n\r",
+						eStatus
+					);
+
+					/* No new data */
+					if(eStatus == MAC_ENUM_NO_DATA)
+					{
+						DBG_vPrintf(TRACE_APP,"  NWK: No new Data\n\r");
+
+						if(s_eDevice.isConfigured)
+						{
+							DBG_vPrintf(TRACE_APP, "\n\rAPP: SEND_DATA_STATE\n\r");
+							s_eDevice.currentState = SEND_DATA_STATE;
+						}
+						else
+						{
+							s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+						}
+					}
+
+					/* Success */
+					else if(eStatus == MAC_ENUM_SUCCESS)
+					{
+						DBG_vPrintf(TRACE_APP,"  NWK: MAC_ENUM_SUCCESS\n\r");
+					}
+
+					/* No acknowledge */
+					else if(eStatus == MAC_ENUM_NO_ACK)
+					{
+						/* add 1 strike */
+						s_network.noNwkStrikes++;
+						DBG_vPrintf
+						(
+							TRACE_APP,
+							"  NWK: No Acknowledge received, strike = %d\n\r",
+							s_network.noNwkStrikes
+						);
+
+						/* if 3 strikes node loses connection */
+						if(s_network.noNwkStrikes >= 3)
+						{
+							s_network.noNwkStrikes = 0;
+							s_network.isConnected = FALSE;
+							DBG_vPrintf(TRACE_APP,"  NWK: Connection lost\n\r");
+						}
+
+						s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+					}
+					else /* unexpected status */
+					{
+						DBG_vPrintf
+						(
+							TRACE_APP,
+							"  NWK: Unexpected poll complete, status = %d\n\r",
+							eStatus
+						);
+						s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+						//TODO: Hanlde error
+					}
+				}
+				break;
 
 				case ZPS_EVENT_APS_DATA_INDICATION:
 				{
@@ -453,11 +453,45 @@ PUBLIC void APP_vtaskSleepingEndDevice()
 						s_eDevice.currentState = PREP_TO_SLEEP_STATE;
 						//TODO: Handle Frame ERROR
 					}
+					else
+					{
+						/* everything OK, now we wait for ZPS_EVENT_APS_DATA_CONFIRM */
+						s_eDevice.currentState = WAIT_CONFIRM_STATE;
+					}
+				}
 
-					/* free the application protocol data unit (APDU) once it has been dealt with */
-					PDUM_eAPduFreeAPduInstance(sStackEvent.uEvent.sApsDataIndEvent.hAPduInst);
+				default:
+				{
+					DBG_vPrintf
+					(
+						TRACE_APP,
+						"  NWK: Poll request unhandled event - %d\n\r",
+						sStackEvent.eType
+					);
+					//s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+					//TODO: Handle error
 				}
 				break;
+			}
+        }
+        break;
+
+        case WAIT_CONFIRM_STATE:
+        {
+        	/* Check if there is any event on the stack */
+			if (ZQ_bQueueReceive(&APP_msgStrainGaugeEvents, &sStackEvent))
+			{
+				DBG_vPrintf
+				(
+					TRACE_APP,
+					"  NWK: New event on the stack APP_msgStrainGaugeEvents = %d\n\r",
+					sStackEvent.eType
+				);
+			}
+
+			switch (sStackEvent.eType)
+			{
+				case ZPS_EVENT_NONE: break;
 
 				case ZPS_EVENT_APS_DATA_CONFIRM:
 				{
@@ -470,23 +504,14 @@ PUBLIC void APP_vtaskSleepingEndDevice()
 						sStackEvent.uEvent.sApsDataConfirmEvent.uDstAddr.u16Addr
 					);
 
-					if(s_eDevice.isConfigured)
-					{
-						DBG_vPrintf(TRACE_APP, "\n\rAPP: READ_SENSOR_STATE\n\r");
-						s_eDevice.currentState = READ_SENSOR_STATE;
-					}
-					else
-					{
-						s_eDevice.currentState = PREP_TO_SLEEP_STATE;
-					}
-
+					s_eDevice.currentState = PREP_TO_SLEEP_STATE;
 				}
 				break;
 
 				default:
 				{
 					DBG_vPrintf(TRACE_APP, "  NWK: unhandled event %d\n", sStackEvent.eType);
-					s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+					//s_eDevice.currentState = PREP_TO_SLEEP_STATE;
 					//TODO: Handle Error
 				}
 				break;
@@ -494,7 +519,7 @@ PUBLIC void APP_vtaskSleepingEndDevice()
         }
         break;
 
-        case READ_SENSOR_STATE:
+        case SEND_DATA_STATE:
         {
         	DBG_vPrintf(TRACE_APP, "\n\rAPP: SEND_DATA_STATE\n\r");
 
@@ -611,49 +636,11 @@ PUBLIC void APP_vtaskSleepingEndDevice()
 
 					/* everything OK, now we wait for ZPS_EVENT_APS_DATA_CONFIRM */
 					DBG_vPrintf(TRACE_APP, "\n\rAPP: SEND_DATA_STATE\n\r");
-					s_eDevice.currentState = SEND_DATA_STATE;
+					s_eDevice.currentState = WAIT_CONFIRM_STATE;
 					break;
 				}
 			}
         	s_eDevice.currentState = PREP_TO_SLEEP_STATE;
-        }
-        break;
-
-        case SEND_DATA_STATE:
-        {
-        	/* check if any messages to collect */
-			if ( ZQ_bQueueReceive(&APP_msgStrainGaugeEvents, &sStackEvent))
-			{
-				DBG_vPrintf(TRACE_APP, "  APP: New event in the stack\n\r");
-			}
-
-			switch (sStackEvent.eType)
-			{
-				case ZPS_EVENT_NONE: break;
-
-				case ZPS_EVENT_APS_DATA_CONFIRM:
-				{
-					/* Acknowledge data was sent */
-					DBG_vPrintf
-					(
-						TRACE_APP,
-						"  NWK: event ZPS_EVENT_APS_DATA_CONFIRM, status = %d, Address = 0x%04x\n",
-						sStackEvent.uEvent.sApsDataConfirmEvent.u8Status,
-						sStackEvent.uEvent.sApsDataConfirmEvent.uDstAddr.u16Addr
-					);
-
-					s_eDevice.currentState = PREP_TO_SLEEP_STATE;
-				}
-				break;
-
-				default:
-				{
-					DBG_vPrintf(TRACE_APP, "  NWK: unhandled event %d\n", sStackEvent.eType);
-					s_eDevice.currentState = PREP_TO_SLEEP_STATE;
-					//TODO: Handle Error
-				}
-				break;
-			}
         }
         break;
 
@@ -1071,6 +1058,9 @@ PRIVATE frameReturnValues_t vHandleIncomingFrame(ZPS_tsAfEvent sStackEvent)
 	/* Size mismatch */
 	if(byteCount == 0)
 	{
+		/* free the application protocol data unit (APDU) once it has been dealt with */
+		PDUM_eAPduFreeAPduInstance(sStackEvent.uEvent.sApsDataIndEvent.hAPduInst);
+
 		DBG_vPrintf(TRACE_APP, "  APP: Frame error, size = 0\n\r");
 		return FRAME_BAD_SIZE;
 	}
@@ -1101,6 +1091,9 @@ PRIVATE frameReturnValues_t vHandleIncomingFrame(ZPS_tsAfEvent sStackEvent)
 			/* Size mismatch */
 			if(byteCount != 8)
 			{
+				/* free the application protocol data unit (APDU) once it has been dealt with */
+				PDUM_eAPduFreeAPduInstance(sStackEvent.uEvent.sApsDataIndEvent.hAPduInst);
+
 				DBG_vPrintf(TRACE_APP, "  APP: Frame error, size = %d\r\n", byteCount);
 				return FRAME_BAD_SIZE;
 			}
@@ -1130,6 +1123,9 @@ PRIVATE frameReturnValues_t vHandleIncomingFrame(ZPS_tsAfEvent sStackEvent)
 
 				pdmStatus = PDM_eSaveRecordData(PDM_APP_ID_GAIN, &s_eDevice.gainValue, sizeof(s_eDevice.gainValue));
 				if(pdmStatus != PDM_E_STATUS_OK) DBG_vPrintf(TRACE_APP, "  APP: PDM_APP_ID_GAIN save error, status = %d\n", pdmStatus);
+
+				/* free the application protocol data unit (APDU) once it has been dealt with */
+				PDUM_eAPduFreeAPduInstance(sStackEvent.uEvent.sApsDataIndEvent.hAPduInst);
 
 				DBG_vPrintf(TRACE_APP, "  APP: Sending response to Coordinator\n\r");
 				/* Allocate memory for APDU buffer with preconfigured "type" */
@@ -1206,6 +1202,9 @@ PRIVATE frameReturnValues_t vHandleIncomingFrame(ZPS_tsAfEvent sStackEvent)
 			pdmStatus = PDM_eSaveRecordData(PDM_APP_ID_CONFIGURED, &s_eDevice.isConfigured, sizeof(s_eDevice.isConfigured));
 			if(pdmStatus != PDM_E_STATUS_OK) DBG_vPrintf(TRACE_APP, "  APP: PDM_APP_ID_CONFIGURED save error, status = %d\n", pdmStatus);
 
+			/* free the application protocol data unit (APDU) once it has been dealt with */
+			PDUM_eAPduFreeAPduInstance(sStackEvent.uEvent.sApsDataIndEvent.hAPduInst);
+
 			DBG_vPrintf(TRACE_APP, "  APP: Sending response to Coordinator\n\r");
 			/* Allocate memory for APDU buffer with preconfigured "type" */
 			PDUM_thAPduInstance data = PDUM_hAPduAllocateAPduInstance(apduMyData);
@@ -1271,17 +1270,31 @@ PRIVATE frameReturnValues_t vHandleIncomingFrame(ZPS_tsAfEvent sStackEvent)
 		case '&':
 		{
 			DBG_vPrintf(TRACE_APP, "  APP: Broadcast request frame\n\r");
+
+			/* free the application protocol data unit (APDU) once it has been dealt with */
+			PDUM_eAPduFreeAPduInstance(sStackEvent.uEvent.sApsDataIndEvent.hAPduInst);
+
 			sendBroadcast();
+
+			/* everything OK, now we wait for ZPS_EVENT_APS_DATA_CONFIRM */
+			return FRAME_SUCCESS;
 		}
 		break;
 
 		default:
 		{
+			/* free the application protocol data unit (APDU) once it has been dealt with */
+			PDUM_eAPduFreeAPduInstance(sStackEvent.uEvent.sApsDataIndEvent.hAPduInst);
+
 			DBG_vPrintf(TRACE_APP, "  APP: Frame format error\n\r");
 			return FRAME_BAD_FORMAT;
 		}
 		break;
 	}
+
+	/* free the application protocol data unit (APDU) once it has been dealt with */
+	PDUM_eAPduFreeAPduInstance(sStackEvent.uEvent.sApsDataIndEvent.hAPduInst);
+
 	DBG_vPrintf(TRACE_APP, "  APP: Frame unknown error\n\r");
 	return FRAME_UNK_ERROR;
 }
