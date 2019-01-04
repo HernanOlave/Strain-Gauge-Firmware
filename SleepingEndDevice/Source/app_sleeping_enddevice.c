@@ -168,6 +168,7 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
     s_network.noNwkStrikes = 0;
     s_network.rejoinStrikes = 0;
 
+    s_eDevice.systemStrikes = 0;
     s_eDevice.isConfigured = FALSE;
     s_eDevice.samplePeriod = DEFAULT_SAMPLE_PERIOD;
     s_eDevice.channelAValue = CHANNEL_A_DEFAULT_VALUE;
@@ -298,14 +299,25 @@ PUBLIC void APP_vtaskSleepingEndDevice()
     }
     else
     {
+    	//TODO: Change timeout to a timer
     	timeout++;
     	if (timeout >= 20000)
     	{
-    		DBG_vPrintf(TRACE_APP, "APP: State machine timed out\n\r");
-    		s_eDevice.currentState = PREP_TO_SLEEP_STATE;
-    		//vAHI_SwReset(); TODO: implement strikes then reset
+    		s_eDevice.systemStrikes++;
+    		DBG_vPrintf
+    		(
+    			TRACE_APP,
+    			"APP: State machine timed out, strike = %d\n\r",
+    			s_eDevice.systemStrikes
+    		);
+    		s_eDevice.previousState = s_eDevice.currentState;
     	}
     }
+
+	if (s_eDevice.systemStrikes >= 5)
+	{
+		vAHI_SwReset();
+	}
 
     /* Main State Machine */
     switch (s_eDevice.currentState)
@@ -456,9 +468,11 @@ PUBLIC void APP_vtaskSleepingEndDevice()
 					else
 					{
 						/* everything OK, now we wait for ZPS_EVENT_APS_DATA_CONFIRM */
+						DBG_vPrintf(TRACE_APP, "\n\rAPP: WAIT_CONFIRM_STATE\n\r");
 						s_eDevice.currentState = WAIT_CONFIRM_STATE;
 					}
 				}
+				break;
 
 				default:
 				{

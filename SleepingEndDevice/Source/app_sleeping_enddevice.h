@@ -84,6 +84,7 @@ typedef enum
 
 typedef struct
 {
+	uint16						systemStrikes;
 	bool						isConfigured;
 	uint16						samplePeriod;
 	uint16						channelAValue;
