@@ -300,7 +300,7 @@ PUBLIC void APP_vtaskSleepingEndDevice()
     else
     {
     	//TODO: Change timeout to a timer
-    	timeout++;
+    	if (s_eDevice.currentState != SLEEP_STATE) timeout++;
     	if (timeout >= 20000)
     	{
     		s_eDevice.systemStrikes++;
@@ -310,7 +310,7 @@ PUBLIC void APP_vtaskSleepingEndDevice()
     			"APP: State machine timed out, strike = %d\n\r",
     			s_eDevice.systemStrikes
     		);
-    		s_eDevice.previousState = s_eDevice.currentState;
+    		s_eDevice.currentState = PREP_TO_SLEEP_STATE;
     	}
     }
 
@@ -439,7 +439,7 @@ PUBLIC void APP_vtaskSleepingEndDevice()
 							"  NWK: Unexpected poll complete, status = %d\n\r",
 							eStatus
 						);
-						s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+						//s_eDevice.currentState = PREP_TO_SLEEP_STATE;
 						//TODO: Hanlde error
 					}
 				}
@@ -535,8 +535,6 @@ PUBLIC void APP_vtaskSleepingEndDevice()
 
         case SEND_DATA_STATE:
         {
-        	DBG_vPrintf(TRACE_APP, "\n\rAPP: SEND_DATA_STATE\n\r");
-
         	static int results[10];
         	int i, j, Imin, temp;
         	uint16 byteCount;
@@ -649,12 +647,12 @@ PUBLIC void APP_vtaskSleepingEndDevice()
 					}
 
 					/* everything OK, now we wait for ZPS_EVENT_APS_DATA_CONFIRM */
-					DBG_vPrintf(TRACE_APP, "\n\rAPP: SEND_DATA_STATE\n\r");
+					DBG_vPrintf(TRACE_APP, "\n\rAPP: WAIT_CONFIRM_STATE\n\r");
 					s_eDevice.currentState = WAIT_CONFIRM_STATE;
 					break;
 				}
 			}
-        	s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+        	//s_eDevice.currentState = PREP_TO_SLEEP_STATE;
         }
         break;
 
@@ -772,12 +770,14 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 						"  NWK: Failed rejoin request, status = %d\n\r",
 						eStatus
 					);
-					s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+					//s_eDevice.currentState = PREP_TO_SLEEP_STATE;
 					//TODO: Handle errors
 				}
-
-		    	DBG_vPrintf(TRACE_APP, "\n\r  NWK: NWK_REJOIN_STATE\n\r");
-		    	s_network.currentState = NWK_REJOIN_STATE;
+		    	else
+		    	{
+		    		DBG_vPrintf(TRACE_APP, "\n\r  NWK: NWK_REJOIN_STATE\n\r");
+		    		s_network.currentState = NWK_REJOIN_STATE;
+		    	}
 		    }
 		    else /* Discovery */
 		    {
@@ -795,104 +795,119 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 						"  NWK: Failed to Start Stack, status = %d\n\r",
 						eStatus
 					);
-					s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+					//s_eDevice.currentState = PREP_TO_SLEEP_STATE;
 					//TODO: Handle error
 				}
-
-		    	DBG_vPrintf(TRACE_APP, "\n\r  NWK: NWK_DISC_STATE\n\r");
-		    	s_network.currentState = NWK_DISC_STATE;
+				else
+				{
+					DBG_vPrintf(TRACE_APP, "\n\r  NWK: NWK_DISC_STATE\n\r");
+					s_network.currentState = NWK_DISC_STATE;
+				}
 		    }
 		}
 		break;
 
 		case NWK_DISC_STATE:
 	    {
-	    	/* If there is no event breaks */
-	    	if(sStackEvent.eType == ZPS_EVENT_NONE) break;
-
-	    	/* Discovery process complete */
-	    	else if(sStackEvent.eType == ZPS_EVENT_NWK_DISCOVERY_COMPLETE)
+	    	switch (sStackEvent.eType)
 	    	{
-	    		DBG_vPrintf
-	    		(
-	    			TRACE_APP,
-	    			"  NWK: Network discovery complete\n\r"
-	    		);
+	    		case ZPS_EVENT_NONE: break;
 
-	    		/* If there is any error in the discovery process stops */
-	    		if(sStackEvent.uEvent.sNwkDiscoveryEvent.eStatus != MAC_ENUM_SUCCESS)
-	    		{
-	    			DBG_vPrintf
-	    			(
-	    				TRACE_APP,
-	    				"  NWK: Network discovery failed, status = %d\n\r",
-	    				sStackEvent.uEvent.sNwkDiscoveryEvent.eStatus
-	    			);
-	    			s_eDevice.currentState = PREP_TO_SLEEP_STATE;
-	    			//TODO: Handle error
-	    		}
-	    		else /* Discovery process successful */
-	    		{
-	    			/* If no network is found stops */
-	    			if(sStackEvent.uEvent.sNwkDiscoveryEvent.u8NetworkCount == 0)
-	    			{
-	    				DBG_vPrintf
-	    				(
-	    					TRACE_APP,
-	    					"  NWK: No network found\n\r"
-	    				);
-	    			}
-	    			else /* Networks found */
-	    			{
-	    				DBG_vPrintf
+	    		/* Discovery process complete */
+				case ZPS_EVENT_NWK_DISCOVERY_COMPLETE:
+				{
+					DBG_vPrintf
+					(
+						TRACE_APP,
+						"  NWK: Network discovery complete\n\r"
+					);
+
+					/* If there is any error in the discovery process stops */
+					if(sStackEvent.uEvent.sNwkDiscoveryEvent.eStatus != MAC_ENUM_SUCCESS)
+					{
+						DBG_vPrintf
 						(
 							TRACE_APP,
-							"  NWK: Found %d networks\n\r",
-							sStackEvent.uEvent.sNwkDiscoveryEvent.u8NetworkCount
+							"  NWK: Network discovery failed, status = %d\n\r",
+							sStackEvent.uEvent.sNwkDiscoveryEvent.eStatus
 						);
-
-	    				/* Get index of recommended network to join */
-						uint8 networkIndex = sStackEvent.uEvent.sNwkDiscoveryEvent.u8SelectedNetwork;
-
-						/* Create network descriptor */
-						ZPS_tsNwkNetworkDescr *psNwkDescr = &sStackEvent.uEvent.sNwkDiscoveryEvent.psNwkDescriptors[networkIndex];
-
-						/* Join request */
-						eStatus = ZPS_eAplZdoJoinNetwork(psNwkDescr);
-						if (eStatus == ZPS_E_SUCCESS)
-						{
-							DBG_vPrintf(TRACE_APP, "  NWK: Joining network\n\r");
-							DBG_vPrintf(TRACE_APP, "  NWK: Ext PAN ID = 0x%016llx\n", psNwkDescr->u64ExtPanId);
-							DBG_vPrintf(TRACE_APP, "\n\r  NWK: NWK_JOIN_STATE\n\r");
-							s_network.currentState = NWK_JOIN_STATE;
-						}
-						else
+						//s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+						//TODO: Handle error
+					}
+					else /* Discovery process successful */
+					{
+						/* If no network is found stops */
+						if(sStackEvent.uEvent.sNwkDiscoveryEvent.u8NetworkCount == 0)
 						{
 							DBG_vPrintf
 							(
 								TRACE_APP,
-								"  NWK: Failed to request network join, status = %d\n\r",
-								eStatus
+								"  NWK: No network found\n\r"
 							);
-							s_eDevice.currentState = PREP_TO_SLEEP_STATE;
-							//TODO: Handle ERROR
 						}
-	    			}
-	    		}
+						else /* Networks found */
+						{
+							DBG_vPrintf
+							(
+								TRACE_APP,
+								"  NWK: Found %d networks\n\r",
+								sStackEvent.uEvent.sNwkDiscoveryEvent.u8NetworkCount
+							);
 
-	    	}
-	    	else
-	    	{
-	    		DBG_vPrintf
-	    		(
-	    			TRACE_APP,
-	    			"  NWK: Discovery unexpected event - %d\n\r",
-	    			sStackEvent.eType
-	    		);
-	    		s_eDevice.currentState = PREP_TO_SLEEP_STATE;
-	    		//TODO: Handle error
-	    	}
+							/* Get index of recommended network to join */
+							uint8 networkIndex = sStackEvent.uEvent.sNwkDiscoveryEvent.u8SelectedNetwork;
 
+							/* Create network descriptor */
+							ZPS_tsNwkNetworkDescr *psNwkDescr = &sStackEvent.uEvent.sNwkDiscoveryEvent.psNwkDescriptors[networkIndex];
+
+							/* Join request */
+							eStatus = ZPS_eAplZdoJoinNetwork(psNwkDescr);
+							if (eStatus == ZPS_E_SUCCESS)
+							{
+								DBG_vPrintf(TRACE_APP, "  NWK: Joining network\n\r");
+								DBG_vPrintf(TRACE_APP, "  NWK: Ext PAN ID = 0x%016llx\n", psNwkDescr->u64ExtPanId);
+								DBG_vPrintf(TRACE_APP, "\n\r  NWK: NWK_JOIN_STATE\n\r");
+								s_network.currentState = NWK_JOIN_STATE;
+							}
+							else if (eStatus == ZPS_NWK_ENUM_NOT_PERMITTED)
+							{
+								DBG_vPrintf
+								(
+									TRACE_APP,
+									"  NWK: Join not permitted, status = %d\n\r",
+									eStatus
+								);
+								s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+							}
+							else
+							{
+								DBG_vPrintf
+								(
+									TRACE_APP,
+									"  NWK: Failed to request network join, status = %d\n\r",
+									eStatus
+								);
+								//s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+								//TODO: Handle ERROR
+							}
+						}
+					}
+				}
+				break;
+
+				default:
+				{
+					DBG_vPrintf
+					(
+						TRACE_APP,
+						"  NWK: Discovery unexpected event - %d\n\r",
+						sStackEvent.eType
+					);
+					// s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+					//TODO: Handle error
+				}
+				break;
+	    	}
 	    }
 	    break;
 
@@ -935,7 +950,7 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 					"  NWK: Node failed to join network, status = %d\n\r",
 					sStackEvent.uEvent.sNwkJoinFailedEvent.u8Status
 				);
-				s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+				//s_eDevice.currentState = PREP_TO_SLEEP_STATE;
 				//TODO: Handle error
 			}
 			else /* Unexpected event */
@@ -946,7 +961,7 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 					"  NWK: Join unexpected event - %d\n\r",
 					sStackEvent.eType
 				);
-				s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+				//s_eDevice.currentState = PREP_TO_SLEEP_STATE;
 				//TODO: Handle error
 			}
 		}
@@ -1011,7 +1026,7 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 
 					//TODO: after X strikes, delete network parameters
 				}
-				s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+				//s_eDevice.currentState = PREP_TO_SLEEP_STATE;
 				//TODO: Handle error
 			}
 			else /* Unexpected event */
@@ -1022,7 +1037,7 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 					"  NWK: Rejoin unexpected event - %d\n\r",
 					sStackEvent.eType
 				);
-				s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+				//s_eDevice.currentState = PREP_TO_SLEEP_STATE;
 				//TODO: Handle error
 			}
 		}
@@ -1036,7 +1051,7 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 				"  NWK: Unhandled State : %d\n",
 				s_network.currentState
 			);
-			s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+			//s_eDevice.currentState = PREP_TO_SLEEP_STATE;
 			//TODO: Handle error
 		}
 		break;
@@ -1412,16 +1427,15 @@ PUBLIC void APP_vGenCallback(uint8 u8Endpoint, ZPS_tsAfEvent *psStackEvent)
 
 
 /* TODO: errores registrados
- * Despues de 3 poll de data y no recibir ack, el nodo "deja" la red y se queda pegado en POLL_DATA_STATE
- * con un reset, intenta reingresar a la red pero se obtiene error "NWK: Node failed to rejoin network. Status: 235"
- * con otro reset el nodo logra conectarse a traves de un rejoin.
  *
  * Despues de reprogamar el concentrador, todos los nodos previamente asociados "pierden" conexion. Despues de 3 intentos
  * el nodo "deja" la red y no puede volver a conectarse con rejoin. Hay que ver que pasa si se elimina el EPID.
  * Una teoria es que el feature de seguridad "frame counter" es el que rechaza mensajes del nodo.
  *
- * Despues de ingresar a una red se genera un POLL event con supuestamente data valida. El handler de Data no detecta ningun
- * evento en la version actual, hace 2 commits aprox arrojaba evento 15 equivalente a ZPS_EVENT_NWK_POLL_CONFIRM. Por otro lado,
+ **********************************************************************************************************************************
+ *
+ * Despues de ingresar a una red se genera uno o mas eventos ZPS_EVENT_NWK_POLL_CONFIRM con supuestamente data valida (MAC_ENUM_SUCCESS).
+ * pero no se genera el evento ZPS_EVENT_APS_DATA_INDICATION, por lo cual no hay data que procesar en el endpoint. Por otro lado,
  * cuando un nodo ingresa a la red, el coordinador siempre arroja la siguiente secuencia:
  *
  * APP: No event to process
@@ -1433,6 +1447,120 @@ PUBLIC void APP_vGenCallback(uint8 u8Endpoint, ZPS_tsAfEvent *psStackEvent)
  *        EndPoint:0
  * APP: No event to process
  * APP: vCheckStackEvent: ZPS_EVENT_ROUTE_DISCOVERY_CFM
+ *
+ **********************************************************************************************************************************
+ *
+ * Cuando se realiza un pareamiento masivo, algunos nodos logran conectarse a la red, pero no enviar el comando broadcast.
+ * De estos ultimos, algunos se recuperan y envian el comando broadcast despues de un reset, los otros aparecen como mensaje
+ * de que se han unido a la red (puerta dbg coordinador) pero en la puerta dbg del nodo aparece:
+ *
+ * *** WAKE UP ROUTINE ***
+ * APP: WAKE_UP_STATE
+ *
+ * APP: NETWORK_STATE
+ *   NWK: NWK_STARTUP_STATE
+ *   NWK: Starting ZPS
+ *   NWK: Failed to Start Stack, status = 139
+ *
+ *   NWK: NWK_DISC_STATE
+ *
+ * APP: PREP_TO_SLEEP_STATE
+ * APP: Sleep for 5 seconds
+ *
+ * el cual implica: ZPS_APL_ZDP_E_NOT_PERMITTED (0x8B) The device is not in the proper state to support the requested operation.
+ * Al realizar un reset, se obtiene:
+ *
+ * APP: Startup
+ * APP: Restoring application data from flash
+ * APP: Device Information:
+ *   MAC: 0x00158d0002a0c881
+ *   EPID: 0x0000000000000000
+ *   Sample Period: 10
+ *   Configured Flag: 0
+ *   Channel A: 2048
+ *   Channel B: 2048
+ *   Gain: 32
+ *
+ * APP: NETWORK_STATE
+ *   NWK: NWK_STARTUP_STATE
+ *   NWK: Starting ZPS
+ *
+ *   NWK: NWK_DISC_STATE
+ *   NWK: New event on the stack APP_msgZpsEvents = 6
+ *   NWK: Discovery unexpected event - 6
+ *
+ * Despues de iniciar un DISCOVERY, se genera evento ZPS_EVENT_NWK_JOINED_AS_ENDDEVICE.
+ * Lo cual corresponde a un reingreso a la red, pero el dispositivo no fue capaz de guardar la EPID en flash
+ *
+ * Cuando el nodo intenta conectarse por primera vez, presenta el siguiente texto:
+ *
+ *   NWK: NWK_JOIN_STATE
+ *   NWK: New event on the stack APP_msgZpsEvents = 15
+ *   NWK: Join unexpected event - 15
+ *
+ *   15 = ZPS_EVENT_NWK_POLL_CONFIRM
+ *
+ * Posterior a esto, en los siguientes WAKEUP el dispositivo no es capaz de iniciar el Stack:
+ *
+ *   NWK: NWK_STARTUP_STATE
+ *   NWK: New event on the stack APP_msgZpsEvents = 15
+ *   NWK: Starting ZPS
+ *   NWK: Failed to Start Stack, status = 139
+ *
+ *   status 139 = ZPS_APL_ZDP_E_NOT_PERMITTED (0x8B)
+ *   event 15 = ZPS_EVENT_NWK_POLL_CONFIRM (0x0F)
+ *
+ * Mas info respecto a lo anterior:
+ *
+ * *** WAKE UP ROUTINE ***
+APP: WAKE_UP_STATE
+
+APP: NETWORK_STATE
+  NWK: NWK_STARTUP_STATE
+  NWK: Starting ZPS
+
+  NWK: NWK_DISC_STATE
+  NWK: New event on the stack APP_msgZpsEvents = 10
+  NWK: Network discovery complete
+  NWK: Found 1 networks
+  NWK: Joining network
+  NWK: Ext PAN ID = 0x00158d0001ba807a
+
+  NWK: NWK_JOIN_STATE
+  NWK: New event on the stack APP_msgZpsEvents = 8
+  NWK: Node failed to join network, status = 235
+APP: State machine timed out, strike = 1
+
+APP: PREP_TO_SLEEP_STATE
+APP: Sleep for 5 seconds
+
+
+*** WAKE UP ROUTINE ***
+APP: WAKE_UP_STATE
+
+APP: NETWORK_STATE
+  NWK: NWK_STARTUP_STATE
+  NWK: Starting ZPS
+
+  NWK: NWK_DISC_STATE
+  NWK: New event on the stack APP_msgZpsEvents = 10
+  NWK: Network discovery complete
+  NWK: Network discovery failed, status = 234
+APP: State machine timed out, strike = 2
+
+APP: PREP_TO_SLEEP_STATE
+APP: Sleep for 5 seconds
+ *
+ * status 234 = MAC_ENUM_NO_BEACON (0xEA)   Scan  failed to find any beacons
+ * status 235 = MAC_ENUM_NO_DATA (0xEB)   No response data after a data request
+ *
+ * por otro lado, el coordinador responde lo siguiente:
+ *
+ * APP: vCheckStackEvent: ZPS_EVENT_NWK_STATUS_INDICATION
+    Address: 0xf8f0
+    Status : 17
+ *
+ **********************************************************************************************************************************
  *
  *
  *
