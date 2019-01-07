@@ -388,6 +388,24 @@ PRIVATE void vHandleStackEvent(ZPS_tsAfEvent sStackEvent)
             	DBG_vPrintf(TRACE_APP, "APP: vCheckStackEvent: ZPS_EVENT_NWK_STATUS_INDICATION\n");
                 DBG_vPrintf(TRACE_APP, "    Address: 0x%x\n", sStackEvent.uEvent.sNwkStatusIndicationEvent.u16NwkAddr);
                 DBG_vPrintf(TRACE_APP, "    Status : %d\n", sStackEvent.uEvent.sNwkStatusIndicationEvent.u8Status);
+
+                if (sStackEvent.uEvent.sNwkStatusIndicationEvent.u8Status == 17)
+                {
+                	ZPS_tsNwkNib * psNib = ZPS_psAplZdoGetNib();
+                	ZPS_tuAddress uDstAddress;
+
+                	uDstAddress.u16Addr = sStackEvent.uEvent.sNwkStatusIndicationEvent.u16NwkAddr;
+
+                	ZPS_eAplZdoTransportNwkKey
+                	(
+                		ZPS_E_ADDR_MODE_SHORT,
+                		uDstAddress,
+                		psNib->sTbl.psSecMatSet[0].au8Key,
+                		psNib->sTbl.psSecMatSet[0].u8KeySeqNum,
+                		FALSE,
+                		0
+                	);
+                }
             }
             break;
 

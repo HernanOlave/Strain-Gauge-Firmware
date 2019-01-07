@@ -158,7 +158,14 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
     if (!((1 << CONFIG_BUTTON_PIN) & u32AHI_DioReadInput()))
     {
         DBG_vPrintf(TRACE_APP, "APP: Deleting all records from flash\n\r");
-        PDM_vDeleteAllDataRecords();
+
+        PDM_vDeleteDataRecord(PDM_APP_ID_SAMPLE_PERIOD);
+        PDM_vDeleteDataRecord(PDM_APP_ID_CONFIGURED);
+        PDM_vDeleteDataRecord(PDM_APP_ID_EPID);
+        PDM_vDeleteDataRecord(PDM_APP_ID_BLACKLIST);
+        PDM_vDeleteDataRecord(PDM_APP_ID_CHANNEL_A);
+        PDM_vDeleteDataRecord(PDM_APP_ID_CHANNEL_B);
+        PDM_vDeleteDataRecord(PDM_APP_ID_GAIN);
     }
 
     /* Load default values on startup */
@@ -239,13 +246,13 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
     ZPS_eAplAfInit();
 
     /* Set security keys */
-    /*ZPS_vAplSecSetInitialSecurityState
+    ZPS_vAplSecSetInitialSecurityState
     (
     	ZPS_ZDO_PRECONFIGURED_LINK_KEY,
         au8DefaultTCLinkKey,
         0x00,
         ZPS_APS_GLOBAL_LINK_KEY
-    );*/
+    );
 
     DBG_vPrintf(TRACE_APP, "APP: Device Information:\n\r");
     DBG_vPrintf(TRACE_APP, "  MAC: 0x%016llx\n\r", ZPS_u64AplZdoGetIeeeAddr());
@@ -781,7 +788,11 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 		    }
 		    else /* Discovery */
 		    {
-		    	ZPS_eAplAibSetApsUseExtendedPanId(0);
+				/* Reset nwk params */
+				void * pvNwk = ZPS_pvAplZdoGetNwkHandle();
+				//ZPS_vNwkNibSetPanId(pvNwk, 0);
+				ZPS_vNwkNibSetExtPanId(pvNwk, 0);
+				ZPS_eAplAibSetApsUseExtendedPanId(0);
 
 		    	/* Start the network stack as a end device */
 				DBG_vPrintf(TRACE_APP, "  NWK: Starting ZPS\n\r");
@@ -879,6 +890,10 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 								);
 								s_eDevice.currentState = PREP_TO_SLEEP_STATE;
 							}
+							else if (eStatus == ZPS_NWK_ENUM_INVALID_REQUEST)
+							{
+								vAHI_SwReset();
+							}
 							else
 							{
 								DBG_vPrintf
@@ -892,6 +907,32 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 							}
 						}
 					}
+				}
+				break;
+
+				/* Unwanted rejoin */
+				case ZPS_EVENT_NWK_JOINED_AS_ENDDEVICE:
+				{
+					DBG_vPrintf
+					(
+						TRACE_APP,
+						"  NWK: Node rejoined network with Address 0x%04x\n",
+						sStackEvent.uEvent.sNwkJoinedEvent.u16Addr
+					);
+
+					s_network.currentEpid = ZPS_u64NwkNibGetEpid(ZPS_pvAplZdoGetNwkHandle());
+
+					PDM_eSaveRecordData
+					(
+						PDM_APP_ID_EPID,
+						&s_network.currentEpid,
+						sizeof(s_network.currentEpid)
+					);
+
+					//TODO: Request AUTH and go to AUTH State
+					s_network.isConnected = TRUE;
+
+					sendBroadcast();
 				}
 				break;
 
