@@ -15,6 +15,6 @@ pdum_apduZDP:
 pdum_apduMyData:
     .long    s_asapduMyDataInstances
     .short    0
-    .short    16
-    .short    4
+    .short    30
+    .short    5
     .zero     2

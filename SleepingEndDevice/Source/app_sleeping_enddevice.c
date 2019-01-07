@@ -239,13 +239,13 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
     ZPS_eAplAfInit();
 
     /* Set security keys */
-    ZPS_vAplSecSetInitialSecurityState
+    /*ZPS_vAplSecSetInitialSecurityState
     (
     	ZPS_ZDO_PRECONFIGURED_LINK_KEY,
         au8DefaultTCLinkKey,
         0x00,
         ZPS_APS_GLOBAL_LINK_KEY
-    );
+    );*/
 
     DBG_vPrintf(TRACE_APP, "APP: Device Information:\n\r");
     DBG_vPrintf(TRACE_APP, "  MAC: 0x%016llx\n\r", ZPS_u64AplZdoGetIeeeAddr());
