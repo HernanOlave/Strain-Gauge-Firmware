@@ -101,52 +101,44 @@ void PermitJoining()
  ****************************************************************************/
 PUBLIC void APP_vInitialiseCoordinator(void)
 {
-    bool_t bDeleteRecords = FALSE;//TRUE;
     uint16 u16DataBytesRead;
 
-    /* If required, at this point delete the network context from flash, perhaps upon some condition
-     * For example, check if a button is being held down at reset, and if so request the Persistent
-     * Data Manager to delete all its records:
-     * e.g. bDeleteRecords = vCheckButtons();
-     * Alternatively, always call PDM_vDelete() if context saving is not required.
-     */
-    if (bDeleteRecords)
-    {
-        DBG_vPrintf(TRACE_APP, "APP: Deleting all records from flash\n");
-        PDM_vDeleteAllDataRecords();
-    }
+    DBG_vPrintf(TRACE_APP, "APP: Restoring application data from flash\n\r");
 
-    /* Restore any application data previously saved to flash
-     * All Application records must be loaded before the call to
-     * ZPS_eAplAfInit
-     */
+    uint64 currentEpid = 0;
     s_eDeviceState.eNodeState = E_STARTUP;
-    PDM_eReadDataFromRecord(PDM_ID_APP_COORD,
-                      		&s_eDeviceState,
-                       		sizeof(s_eDeviceState),
-                       		&u16DataBytesRead);
+
+	PDM_eReadDataFromRecord
+	(
+		PDM_APP_ID_EPID,
+		&currentEpid,
+		sizeof(currentEpid),
+		&u16DataBytesRead
+	);
+
+    PDM_eReadDataFromRecord
+    (
+    	PDM_ID_APP_COORD,
+        &s_eDeviceState.eNodeState,
+        sizeof(s_eDeviceState.eNodeState),
+        &u16DataBytesRead
+    );
+
+    DBG_vPrintf(TRACE_APP, "APP: Device Information:\n\r");
+    DBG_vPrintf(TRACE_APP, "  MAC: 0x%016llx\n\r", ZPS_u64AplZdoGetIeeeAddr());
+    DBG_vPrintf(TRACE_APP, "  EPID: 0x%016llx\n\r", currentEpid);
+    DBG_vPrintf(TRACE_APP, "  Current State: %d\n\r", s_eDeviceState.eNodeState);
 
     /* Initialise ZBPro stack */
     ZPS_eAplAfInit();
-    ZPS_vAplSecSetInitialSecurityState(ZPS_ZDO_PRECONFIGURED_LINK_KEY,
-                                       au8DefaultTCLinkKey,
-                                       0x00,
-                                       ZPS_APS_GLOBAL_LINK_KEY);
-    /* Initialise other software modules
-     * HERE
-     */
+    ZPS_vAplSecSetInitialSecurityState
+    (
+    	ZPS_ZDO_PRECONFIGURED_LINK_KEY,
+        au8DefaultTCLinkKey,
+        0x00,
+        ZPS_APS_GLOBAL_LINK_KEY
+    );
 
-    /* Always initialise any peripherals used by the application
-     * HERE
-     */
-
-    /* If the device state has been restored from flash, re-start the stack
-     * and set the application running again. Note that if there is more than 1 state
-     * where the network has already joined, then the other states should also be included
-     * in the test below
-     * E.g. E_RUNNING_1, E_RUNNING_2......
-     * if (E_RUNNING_1 == s_sDevice || E_RUNNING_2 == s_sDevice)
-     */
     if (E_RUNNING == s_eDeviceState.eNodeState)
     {
         ZPS_teStatus eStatus = ZPS_eAplZdoStartStack();
@@ -161,9 +153,6 @@ PUBLIC void APP_vInitialiseCoordinator(void)
         /* Turn on joining */
         PermitJoining();
 
-        /* Re-start any other application software modules
-         * HERE
-         */
     }
     else /* perform any actions require on initial start-up */
     {

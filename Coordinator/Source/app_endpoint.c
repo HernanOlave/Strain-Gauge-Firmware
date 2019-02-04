@@ -40,6 +40,7 @@
 #include <zps_apl_af.h>
 #include "AppHardwareApi.h"
 #include "ZQueue.h"
+#include "app_coordinator.h"
 #include "app_common.h"
 #include "pdum_gen.h"
 #include "zps_gen.h"
@@ -470,6 +471,48 @@ void ProcessUART()
 			}
 			break;
 		}
+
+        case '?':
+        {
+        	uint64 macAddress = ZPS_u64AplZdoGetIeeeAddr();
+        	DBG_vPrintf(TRACE_APP, "  APP: MAC = 0x%016llx\n\r", macAddress);
+
+			#if SBC_UART_DISABLE == 0
+
+			char dataString[35] = { 0 };
+			uint8 i = 0;
+			dataString[i++] = '?';
+			dataString[i++] = ':';
+			i += u16ToHex( &dataString[i], (uint16) ((macAddress >> 48) & 0xFFFF) );
+			i += u16ToHex( &dataString[i], (uint16) ((macAddress >> 32) & 0xFFFF) );
+			i += u16ToHex( &dataString[i], (uint16) ((macAddress >> 16) & 0xFFFF) );
+			i += u16ToHex( &dataString[i], (uint16) (macAddress & 0xFFFF) );
+			dataString[i++] = '\n';
+
+			u16AHI_UartBlockWriteData( E_AHI_UART_1, (uint8 *) dataString, strlen( dataString ) );
+			#endif
+
+        	break;
+        }
+
+        case '+':
+		{
+
+			uint64 currentEpid = 0;
+
+			currentEpid = strtoll( &uartRxBuffer[2], NULL, 16 );
+			DBG_vPrintf(TRACE_APP, "  APP: EPID = 0x%016llx\n\r", currentEpid);
+
+			PDM_eSaveRecordData
+			(
+				PDM_APP_ID_EPID,
+				&currentEpid,
+				sizeof(currentEpid)
+			);
+
+			break;
+		}
+
         default:
             DBG_vPrintf( TRACE_APP, "UART Unrecognized Command" );
         }
