@@ -105,16 +105,7 @@ PUBLIC void APP_vInitialiseCoordinator(void)
 
     DBG_vPrintf(TRACE_APP, "APP: Restoring application data from flash\n\r");
 
-    uint64 currentEpid = 0;
     s_eDeviceState.eNodeState = E_STARTUP;
-
-	PDM_eReadDataFromRecord
-	(
-		PDM_APP_ID_EPID,
-		&currentEpid,
-		sizeof(currentEpid),
-		&u16DataBytesRead
-	);
 
     PDM_eReadDataFromRecord
     (
@@ -123,11 +114,6 @@ PUBLIC void APP_vInitialiseCoordinator(void)
         sizeof(s_eDeviceState.eNodeState),
         &u16DataBytesRead
     );
-
-    DBG_vPrintf(TRACE_APP, "APP: Device Information:\n\r");
-    DBG_vPrintf(TRACE_APP, "  MAC: 0x%016llx\n\r", ZPS_u64AplZdoGetIeeeAddr());
-    DBG_vPrintf(TRACE_APP, "  EPID: 0x%016llx\n\r", currentEpid);
-    DBG_vPrintf(TRACE_APP, "  Current State: %d\n\r", s_eDeviceState.eNodeState);
 
     /* Initialise ZBPro stack */
     ZPS_eAplAfInit();
@@ -138,6 +124,10 @@ PUBLIC void APP_vInitialiseCoordinator(void)
         0x00,
         ZPS_APS_GLOBAL_LINK_KEY
     );
+
+    DBG_vPrintf(TRACE_APP, "APP: Device Information:\n\r");
+	DBG_vPrintf(TRACE_APP, "  MAC: 0x%016llx\n\r", ZPS_u64AplZdoGetIeeeAddr());
+	DBG_vPrintf(TRACE_APP, "  Current State: %d\n\r", s_eDeviceState.eNodeState);
 
     if (E_RUNNING == s_eDeviceState.eNodeState)
     {

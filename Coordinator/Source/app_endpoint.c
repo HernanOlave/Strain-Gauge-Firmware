@@ -477,6 +477,9 @@ void ProcessUART()
         	uint64 macAddress = ZPS_u64AplZdoGetIeeeAddr();
         	DBG_vPrintf(TRACE_APP, "  APP: MAC = 0x%016llx\n\r", macAddress);
 
+        	DBG_vPrintf(TRACE_APP, "  APP: EPID = 0x%016llx\n\r", ZPS_u64NwkNibGetEpid(ZPS_pvAplZdoGetNwkHandle()));
+
+
 			#if SBC_UART_DISABLE == 0
 
 			char dataString[35] = { 0 };
@@ -494,24 +497,6 @@ void ProcessUART()
 
         	break;
         }
-
-        case '+':
-		{
-
-			uint64 currentEpid = 0;
-
-			currentEpid = strtoll( &uartRxBuffer[2], NULL, 16 );
-			DBG_vPrintf(TRACE_APP, "  APP: EPID = 0x%016llx\n\r", currentEpid);
-
-			PDM_eSaveRecordData
-			(
-				PDM_APP_ID_EPID,
-				&currentEpid,
-				sizeof(currentEpid)
-			);
-
-			break;
-		}
 
         default:
             DBG_vPrintf( TRACE_APP, "UART Unrecognized Command" );

@@ -977,6 +977,7 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 				);
 
 				//TODO: Request AUTH and go to AUTH State
+				s_network.rejoinStrikes = 0;
 				s_network.isConnected = TRUE;
 
 				sendBroadcast();
@@ -1037,6 +1038,7 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 				);
 
 				/* Device reconnected successfully */
+				s_network.rejoinStrikes = 0;
 				s_network.isConnected = TRUE;
 
 				sendBroadcast();
@@ -1065,9 +1067,22 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 						s_network.rejoinStrikes
 					);
 
-					//TODO: after X strikes, delete network parameters
+					if(s_network.rejoinStrikes >= 5)
+					{
+						DBG_vPrintf(TRACE_APP, "  NWK: Deleting network parameters..\n\r");
+						/* Reset nwk params */
+						void * pvNwk = ZPS_pvAplZdoGetNwkHandle();
+						//ZPS_vNwkNibSetPanId(pvNwk, 0);
+						ZPS_vNwkNibSetExtPanId(pvNwk, 0);
+						ZPS_eAplAibSetApsUseExtendedPanId(0);
+
+						s_network.currentEpid = 0;
+						PDM_vDeleteDataRecord(PDM_APP_ID_EPID);
+
+						s_network.rejoinStrikes = 0;
+					}
 				}
-				//s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+				s_eDevice.currentState = PREP_TO_SLEEP_STATE;
 				//TODO: Handle error
 			}
 			else /* Unexpected event */
