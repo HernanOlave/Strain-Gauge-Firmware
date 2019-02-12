@@ -331,7 +331,6 @@ PUBLIC void APP_vSetUpHardware(void)
  ****************************************************************************/
 PUBLIC void APP_vInitResources(void)
 {
-
     /* Initialise the Z timer module */
     ZTIMER_eInit(asTimers, sizeof(asTimers) / sizeof(ZTIMER_tsTimer));
 
@@ -341,8 +340,6 @@ PUBLIC void APP_vInitResources(void)
     ZQ_vQueueCreate(&APP_msgZpsEvents,           ZPS_QUEUE_SIZE,        sizeof(ZPS_tsAfEvent),       (uint8*)asStackEvents);
     ZQ_vQueueCreate(&APP_msgStrainGaugeEvents,   APP_QUEUE_SIZE,        sizeof(ZPS_tsAfEvent),       (uint8*)asAppEvents);
 	ZQ_vQueueCreate(&zps_msgMcpsDcfm,            MCPS_DCFM_QUEUE_SIZE,  sizeof(MAC_tsMcpsVsCfmData),(uint8*)asMacMcpsDcfm);
-
-
 }
 
 /****************************************************************************

@@ -128,6 +128,7 @@ tszQueue APP_msgZpsEvents;
 
 PRIVATE uint8 watchdogTimer;
 PRIVATE uint8 authTimer;
+PRIVATE uint8 pollTimer;
 
 PRIVATE uint64 blacklistEpids[BLACKLIST_MAX] = { 0 };
 PRIVATE uint8  blacklistIndex = 0;
@@ -148,7 +149,7 @@ PUBLIC void vWakeCallBack(void)
 
 PUBLIC void authTimerCallback(void * params)
 {
-	ZTIMER_eClose( authTimer );
+	ZTIMER_eStop( authTimer );
 
     // auth code response TIMEOUT
     DBG_vPrintf(TRACE_APP, "  APP: AUTH Code NOT Received\n");
@@ -159,7 +160,7 @@ PUBLIC void authTimerCallback(void * params)
 
 PUBLIC void watchdogCallback(void * params)
 {
-	ZTIMER_eClose( watchdogTimer );
+	ZTIMER_eStop( watchdogTimer );
 
 	s_eDevice.systemStrikes++;
 	DBG_vPrintf
@@ -307,6 +308,11 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
     DBG_vPrintf(TRACE_APP, "  Channel B: %d\n\r", s_eDevice.channelBValue);
     DBG_vPrintf(TRACE_APP, "  Gain: %d\n\r", s_eDevice.gainValue);
 
+    /* Initialize Timers */
+    ZTIMER_eOpen(&watchdogTimer, watchdogCallback, NULL, ZTIMER_FLAG_ALLOW_SLEEP);
+    ZTIMER_eOpen(&authTimer, authTimerCallback, NULL, ZTIMER_FLAG_ALLOW_SLEEP);
+    ZTIMER_eOpen(&pollTimer, NULL, NULL, ZTIMER_FLAG_ALLOW_SLEEP);
+
     /* Send DAC and OPAMP to low power */
 	ENABLE_3VLN();
 	ad8231_init();
@@ -345,13 +351,6 @@ PUBLIC void APP_vtaskSleepingEndDevice()
     /* State machine watchdog */
     if(s_eDevice.currentState != s_eDevice.previousState)
     {
-    	ZTIMER_eOpen
-		(
-			&watchdogTimer,
-			watchdogCallback,
-			NULL,
-			ZTIMER_FLAG_PREVENT_SLEEP
-		);
 		ZTIMER_eStart (watchdogTimer, ZTIMER_TIME_SEC(WATCHDOG_TIMEOUT));
     	s_eDevice.previousState = s_eDevice.currentState;
     }
@@ -717,7 +716,7 @@ PUBLIC void APP_vtaskSleepingEndDevice()
         {
         	DBG_vPrintf(TRACE_APP, "\n\rAPP: PREP_TO_SLEEP_STATE\n\r");
 
-        	ZTIMER_eClose( watchdogTimer );
+        	ZTIMER_eStop( watchdogTimer );
 
 			if(s_eDevice.isConfigured && s_network.isConnected)
 				s_eDevice.sleepTime = s_eDevice.samplePeriod;
@@ -1021,7 +1020,7 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 				/* Send authentication request and wait for coordinator's response */
 				sendAuthReq();
 
-				DBG_vPrintf(TRACE_APP,"  NWK: AUTH State\n\r");
+				DBG_vPrintf(TRACE_APP,"\n\r  NWK: NWK_AUTH_STATE\n\r");
 				s_network.currentState = NWK_AUTH_STATE;
 			}
 
@@ -1053,7 +1052,12 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 
 		case NWK_AUTH_STATE:
 		{
-			ZPS_eAplZdoPoll();
+			/* Poll every 1 sec */
+			if ( ZTIMER_eGetState(pollTimer) == E_ZTIMER_STATE_EXPIRED )
+			{
+				ZPS_eAplZdoPoll();
+				ZTIMER_eStart (pollTimer, ZTIMER_TIME_SEC(1));
+			}
 
 		    switch(sStackEvent.eType)
 		    {
@@ -1070,14 +1074,8 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 						sStackEvent.uEvent.sApsDataConfirmEvent.uDstAddr.u16Addr
 					);
 
-					ZTIMER_eOpen
-					(
-						&authTimer,
-						authTimerCallback,
-						NULL,
-						ZTIMER_FLAG_PREVENT_SLEEP
-					);
 					ZTIMER_eStart (authTimer, ZTIMER_TIME_SEC(AUTH_TIMEOUT));
+					ZTIMER_eStart (pollTimer, ZTIMER_TIME_SEC(1));
 				}
 				break;
 
@@ -1136,13 +1134,13 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 							/* Node successfully connected and authenticated */
 							s_network.isConnected = TRUE;
 
-							ZTIMER_eClose( authTimer );
+							ZTIMER_eStop( authTimer );
 
 						}
 						else
 						{
 							// auth code incorrect
-							ZTIMER_eClose( authTimer );
+							ZTIMER_eStop( authTimer );
 
 							// add EPID to blacklist
 							blacklistNetwork();
@@ -1153,7 +1151,7 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 					else
 					{
 						// auth code size incorrect
-						ZTIMER_eClose( authTimer );
+						ZTIMER_eStop( authTimer );
 
 						// add EPID to blacklist
 						blacklistNetwork();
