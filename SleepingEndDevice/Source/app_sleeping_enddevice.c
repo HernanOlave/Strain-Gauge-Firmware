@@ -107,6 +107,7 @@ PRIVATE frameReturnValues_t vHandleIncomingFrame(ZPS_tsAfEvent sStackEvent);
 PRIVATE void sendBroadcast(void);
 PRIVATE void sendAuthReq(void);
 PRIVATE void blacklistNetwork(void);
+PRIVATE uint16 getMedianAvg(uint8 adcChannel, uint8 samples);
 
 /****************************************************************************/
 /***        Exported Variables                                            ***/
@@ -591,8 +592,6 @@ PUBLIC void APP_vtaskSleepingEndDevice()
 
         case SEND_DATA_STATE:
         {
-        	static int results[10];
-        	int i, j, Imin, temp;
         	uint16 byteCount;
         	PDUM_teStatus status;
 
@@ -609,40 +608,15 @@ PUBLIC void APP_vtaskSleepingEndDevice()
 			/* Start ADC Conversion */
 			MCP3204_init(0);
 
-			for (i = 0; i < 10; i++) results[i] = MCP3204_convert(0, 2);
-
-			for(i = 0; i < 10-1; i++)
-			{
-				Imin = i;
-				for(j = i + 1; j < 10; j++)
-				{
-					if(results[j] < results[Imin])
-					{
-						Imin = j;
-					}
-				}
-				temp = results[Imin];
-				results[Imin] = results[i];
-				results[i] = temp;
-			}
+			s_eDevice.sensorValue = getMedianAvg(2, 10);
+			s_eDevice.temperatureValue = getMedianAvg(1, 10);
+			s_eDevice.batteryLevel = getMedianAvg(0, 10);
 
 			/* Low power Config */
 			ad8231_disable();
 			ltc1661_sleep();
 			DISABLE_WB();
 			ENABLE_POWERSAVE();
-
-			DBG_vPrintf(TRACE_APP, "  APP: sorted Values = ");
-			for (i = 0; i < 10; i++) DBG_vPrintf(TRACE_APP,"%d, ", results[i]);
-			DBG_vPrintf(TRACE_APP, "\n\r");
-
-			s_eDevice.sensorValue = results[3];
-			s_eDevice.sensorValue += results[4];
-			s_eDevice.sensorValue += results[5];
-			s_eDevice.sensorValue /= 3;
-
-			s_eDevice.temperatureValue = MCP3204_convert(0, 1);
-			s_eDevice.batteryLevel = MCP3204_convert(0, 0);
 
 			DBG_vPrintf(TRACE_APP, "  APP: sensorValue = %d\n\r", s_eDevice.sensorValue);
 			DBG_vPrintf(TRACE_APP, "  APP: temperatureValue = %d\n\r", s_eDevice.temperatureValue);
@@ -1697,6 +1671,55 @@ PRIVATE void blacklistNetwork(void)
     {
         DBG_vPrintf(TRACE_APP, " APP: LeaveNetwork Request Failed, status = %d\n\r", status);
     }
+}
+
+/****************************************************************************
+ *
+ * NAME: getMedianAvg
+ *
+ * DESCRIPTION:
+ * Returns the average of the three median values from a list.
+ *
+ * RETURNS:
+ * void
+ *
+ ****************************************************************************/
+PRIVATE uint16 getMedianAvg(uint8 adcChannel, uint8 samples)
+{
+	uint16 i, j, Imin, temp;
+	uint16 results[samples+1];
+
+	if (samples < 3) return 0;
+
+	DBG_vPrintf(TRACE_APP, "  APP: getting %d values from channel %d\n\r", samples, adcChannel);
+
+	for (i = 0; i < samples; i++) results[i] = MCP3204_convert(0, adcChannel);
+
+	for(i = 0; i < 10-1; i++)
+	{
+		Imin = i;
+		for(j = i + 1; j < 10; j++)
+		{
+			if(results[j] < results[Imin])
+			{
+				Imin = j;
+			}
+		}
+		temp = results[Imin];
+		results[Imin] = results[i];
+		results[i] = temp;
+	}
+
+	DBG_vPrintf(TRACE_APP, "  APP: sorted Values = ");
+	for (i = 0; i < samples; i++) DBG_vPrintf(TRACE_APP,"%d, ", results[i]);
+	DBG_vPrintf(TRACE_APP, "\n\r");
+
+	temp = results[3];
+	temp += results[4];
+	temp += results[5];
+	temp /= 3;
+
+	return temp;
 }
 
 /****************************************************************************
