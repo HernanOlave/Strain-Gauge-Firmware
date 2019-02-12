@@ -68,6 +68,9 @@
 #define NO_NETWORK_SLEEP_DUR        10  // seconds
 #define AUTH_TIMEOUT    			5	// seconds
 #define WATCHDOG_TIMEOUT			10	// seconds
+#define MAX_REJOIN_STRIKES			100 // times
+#define MAX_SYSTEM_STRIKES			5	// times
+#define MAX_NO_NWK_STRIKES			3	// times (fixed by ZPS_Config Editor)
 #define SECS_TO_TICKS(seconds)		seconds * 32768
 
 #define CONFIG_BUTTON_PIN			13
@@ -356,7 +359,7 @@ PUBLIC void APP_vtaskSleepingEndDevice()
     	s_eDevice.previousState = s_eDevice.currentState;
     }
 
-	if (s_eDevice.systemStrikes >= 5)
+	if (s_eDevice.systemStrikes >= MAX_SYSTEM_STRIKES)
 	{
 		vAHI_SwReset();
 	}
@@ -479,7 +482,7 @@ PUBLIC void APP_vtaskSleepingEndDevice()
 						);
 
 						/* if 3 strikes node loses connection */
-						if(s_network.noNwkStrikes >= 3)
+						if(s_network.noNwkStrikes >= MAX_NO_NWK_STRIKES)
 						{
 							s_network.noNwkStrikes = 0;
 							s_network.isConnected = FALSE;
@@ -1190,7 +1193,7 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 					s_network.rejoinStrikes
 				);
 
-				if(s_network.rejoinStrikes >= 5)
+				if(s_network.rejoinStrikes >= MAX_REJOIN_STRIKES)
 				{
 					DBG_vPrintf(TRACE_APP, "  NWK: Deleting network parameters..\n\r");
 					/* Reset nwk params */
