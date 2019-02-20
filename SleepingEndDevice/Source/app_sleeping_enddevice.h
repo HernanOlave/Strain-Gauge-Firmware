@@ -57,7 +57,6 @@ typedef enum
     NWK_DISC_STATE,
     NWK_JOIN_STATE,
     NWK_AUTH_STATE,
-    NWK_LEAVE_STATE,
     NWK_REJOIN_STATE
 } networkStates_t;
 

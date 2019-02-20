@@ -66,11 +66,11 @@
 #endif
 
 #define NO_NETWORK_SLEEP_DUR        10  // seconds
-#define AUTH_TIMEOUT    			5	// seconds
 #define WATCHDOG_TIMEOUT			10	// seconds
 #define MAX_REJOIN_STRIKES			100 // times
 #define MAX_SYSTEM_STRIKES			5	// times
 #define MAX_NO_NWK_STRIKES			3	// times (fixed by ZPS_Config Editor)
+#define MAX_AUTH_STRIKES			3	// times (fixed by ZPS_Config Editor)
 #define SECS_TO_TICKS(seconds)		seconds * 32768
 
 #define CONFIG_BUTTON_PIN			13
@@ -96,9 +96,11 @@ typedef struct
 	networkStates_t		currentState;
 	uint64				currentEpid;
 	bool				isConnected;
+	bool				isAuthenticated;
 	uint8				ackStrikes;
 	uint8				noNwkStrikes;
 	uint8				rejoinStrikes;
+	uint8				authStrikes;
 } networkDesc_t;
 
 /****************************************************************************/
@@ -149,17 +151,6 @@ PUBLIC void vWakeCallBack(void)
 	DBG_vPrintf(TRACE_APP, "\n\r\n\r*** WAKE UP ROUTINE ***\n\r");
 	DBG_vPrintf(TRACE_APP, "APP: WAKE_UP_STATE\n\r");
 	s_eDevice.currentState = WAKE_UP_STATE;
-}
-
-PUBLIC void authTimerCallback(void * params)
-{
-	ZTIMER_eStop( authTimer );
-
-    // auth code response TIMEOUT
-    DBG_vPrintf(TRACE_APP, "  APP: AUTH Code NOT Received\n");
-    blacklistNetwork();
-
-    s_eDevice.currentState = PREP_TO_SLEEP_STATE;
 }
 
 PUBLIC void watchdogCallback(void * params)
@@ -220,6 +211,7 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
     /* Load default values on startup */
     s_network.currentEpid = 0;
     s_network.isConnected = FALSE;
+    s_network.isAuthenticated = FALSE;
     s_network.ackStrikes = 0;
     s_network.noNwkStrikes = 0;
     s_network.rejoinStrikes = 0;
@@ -314,8 +306,6 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
 
     /* Initialize Timers */
     ZTIMER_eOpen(&watchdogTimer, watchdogCallback, NULL, ZTIMER_FLAG_ALLOW_SLEEP);
-    ZTIMER_eOpen(&authTimer, authTimerCallback, NULL, ZTIMER_FLAG_ALLOW_SLEEP);
-    ZTIMER_eOpen(&pollTimer, NULL, NULL, ZTIMER_FLAG_ALLOW_SLEEP);
 
     /* Send DAC and OPAMP to low power */
 	ENABLE_3VLN();
@@ -391,12 +381,13 @@ PUBLIC void APP_vtaskSleepingEndDevice()
 
         	vHandleNetwork(sStackEvent);
 
-        	if(s_network.isConnected)
+        	if(s_network.isConnected && s_network.isAuthenticated)
         	{
         		DBG_vPrintf(TRACE_APP, "APP: Device is connected\n\r");
 
         		s_network.noNwkStrikes = 0;
         		s_network.rejoinStrikes = 0;
+        		s_network.authStrikes = 0;
 
         		/* Send broadcast and wait for confirmation */
         		sendBroadcast();
@@ -685,7 +676,6 @@ PUBLIC void APP_vtaskSleepingEndDevice()
 					break;
 				}
 			}
-        	//s_eDevice.currentState = PREP_TO_SLEEP_STATE;
         }
         break;
 
@@ -695,7 +685,7 @@ PUBLIC void APP_vtaskSleepingEndDevice()
 
         	ZTIMER_eStop( watchdogTimer );
 
-			if(s_eDevice.isConfigured && s_network.isConnected)
+			if(s_eDevice.isConfigured && s_network.isConnected && s_network.isAuthenticated)
 				s_eDevice.sleepTime = s_eDevice.samplePeriod;
 			else s_eDevice.sleepTime = DEFAULT_SLEEP_TIME;
 
@@ -726,13 +716,24 @@ PUBLIC void APP_vtaskSleepingEndDevice()
 
         case WAKE_UP_STATE:
 		{
-			if(s_network.isConnected)
+			if(s_network.isConnected && s_network.isAuthenticated)
 			{
 				/* Poll data from Stack */
 				ZPS_eAplZdoPoll();
 
 				DBG_vPrintf(TRACE_APP, "\n\rAPP: POLL_DATA_STATE\n\r");
 				s_eDevice.currentState = POLL_DATA_STATE;
+			}
+			else if(s_network.isConnected && !s_network.isAuthenticated)
+			{
+				/* Poll data from Stack */
+				ZPS_eAplZdoPoll();
+
+				DBG_vPrintf(TRACE_APP, "\n\rAPP: NETWORK_STATE\n\r");
+				s_eDevice.currentState = NETWORK_STATE;
+
+				DBG_vPrintf(TRACE_APP, "  NWK: NWK_STARTUP_STATE\n\r");
+				s_network.currentState = NWK_AUTH_STATE;
 			}
 			else
 			{
@@ -955,11 +956,14 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 						sStackEvent.uEvent.sNwkJoinedEvent.u16Addr
 					);
 
+					/* Node connected successfully */
+					s_network.isConnected = TRUE;
+
 					/* Send authentication request and wait for coordinator's response */
 					sendAuthReq();
 
-					DBG_vPrintf(TRACE_APP,"\n\r  NWK: NWK_AUTH_STATE\n\r");
-					s_network.currentState = NWK_AUTH_STATE;
+					DBG_vPrintf(TRACE_APP,"\n\rAPP: WAIT_CONFIRM_STATE\n\r");
+					s_eDevice.currentState = WAIT_CONFIRM_STATE;
 				}
 				break;
 
@@ -994,11 +998,14 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 				    sStackEvent.uEvent.sNwkJoinedEvent.u16Addr
 				);
 
+				/* Node connected successfully */
+				s_network.isConnected = TRUE;
+
 				/* Send authentication request and wait for coordinator's response */
 				sendAuthReq();
 
-				DBG_vPrintf(TRACE_APP,"\n\r  NWK: NWK_AUTH_STATE\n\r");
-				s_network.currentState = NWK_AUTH_STATE;
+				DBG_vPrintf(TRACE_APP,"\n\rAPP: WAIT_CONFIRM_STATE\n\r");
+				s_eDevice.currentState = WAIT_CONFIRM_STATE;
 			}
 
 			/* Node failed to join */
@@ -1029,34 +1036,12 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 
 		case NWK_AUTH_STATE:
 		{
-			/* Poll every 1 sec */
-			if ( ZTIMER_eGetState(pollTimer) == E_ZTIMER_STATE_EXPIRED )
-			{
-				ZPS_eAplZdoPoll();
-				ZTIMER_eStart (pollTimer, ZTIMER_TIME_SEC(1));
-			}
-
 		    switch(sStackEvent.eType)
 		    {
 		    	case ZPS_EVENT_NONE: break;
 
-		    	case ZPS_EVENT_APS_DATA_CONFIRM:
-				{
-					/* Acknowledge data was sent */
-					DBG_vPrintf
-					(
-						TRACE_APP,
-						"  NWK: event ZPS_EVENT_APS_DATA_CONFIRM, status = %d, Address = 0x%04x\n",
-						sStackEvent.uEvent.sApsDataConfirmEvent.u8Status,
-						sStackEvent.uEvent.sApsDataConfirmEvent.uDstAddr.u16Addr
-					);
-
-					ZTIMER_eStart (authTimer, ZTIMER_TIME_SEC(AUTH_TIMEOUT));
-					ZTIMER_eStart (pollTimer, ZTIMER_TIME_SEC(1));
-				}
-				break;
-
-		    	case ZPS_EVENT_NWK_POLL_CONFIRM:
+		    	/* Poll request completed */
+				case ZPS_EVENT_NWK_POLL_CONFIRM:
 				{
 					uint8 eStatus;
 					eStatus = sStackEvent.uEvent.sNwkPollConfirmEvent.u8Status;
@@ -1067,6 +1052,62 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 						"  NWK: ZPS_EVENT_NEW_POLL_COMPLETE, status = %d\n\r",
 						eStatus
 					);
+
+					/* No new data */
+					if(eStatus == MAC_ENUM_NO_DATA)
+					{
+						DBG_vPrintf(TRACE_APP,"  NWK: No new Data\n\r");
+
+						s_network.authStrikes++;
+						DBG_vPrintf(TRACE_APP,"  APP: No Auth code received, strike %d\n\r", s_network.authStrikes);
+
+						if(s_network.authStrikes >= MAX_AUTH_STRIKES)
+						{
+							/* Auth code not received, add EPID to blacklist */
+							blacklistNetwork();
+						}
+						s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+					}
+
+					/* Success */
+					else if(eStatus == MAC_ENUM_SUCCESS)
+					{
+						DBG_vPrintf(TRACE_APP,"  NWK: MAC_ENUM_SUCCESS\n\r");
+					}
+
+					/* No acknowledge */
+					else if(eStatus == MAC_ENUM_NO_ACK)
+					{
+						/* add 1 strike */
+						s_network.noNwkStrikes++;
+						DBG_vPrintf
+						(
+							TRACE_APP,
+							"  NWK: No Acknowledge received, strike = %d\n\r",
+							s_network.noNwkStrikes
+						);
+
+						/* if 3 strikes node loses connection */
+						if(s_network.noNwkStrikes >= MAX_NO_NWK_STRIKES)
+						{
+							s_network.noNwkStrikes = 0;
+							s_network.isConnected = FALSE;
+							DBG_vPrintf(TRACE_APP,"  NWK: Connection lost\n\r");
+						}
+
+						s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+					}
+					else /* unexpected status */
+					{
+						DBG_vPrintf
+						(
+							TRACE_APP,
+							"  NWK: Unexpected poll complete, status = %d\n\r",
+							eStatus
+						);
+						//s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+						//TODO: Hanlde error
+					}
 				}
 				break;
 
@@ -1108,31 +1149,22 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 								sizeof(s_network.currentEpid)
 							);
 
-							/* Node successfully connected and authenticated */
-							s_network.isConnected = TRUE;
-
-							ZTIMER_eStop( authTimer );
-
+							/* Node successfully authenticated */
+							s_network.isAuthenticated = TRUE;
 						}
 						else
 						{
-							// auth code incorrect
-							ZTIMER_eStop( authTimer );
-
-							// add EPID to blacklist
+							/* Auth code incorrect, add EPID to blacklist */
+							DBG_vPrintf(TRACE_APP, "  APP: AUTH Code incorrect\n\r");
 							blacklistNetwork();
-
 							s_eDevice.currentState = PREP_TO_SLEEP_STATE;
 						}
 					}
 					else
 					{
-						// auth code size incorrect
-						ZTIMER_eStop( authTimer );
-
-						// add EPID to blacklist
+						/* Auth code size incorrect, add EPID to blacklist */
+						DBG_vPrintf(TRACE_APP, "  APP: AUTH Code size incorrect\n\r");
 						blacklistNetwork();
-
 						s_eDevice.currentState = PREP_TO_SLEEP_STATE;
 					}
 				}
@@ -1144,12 +1176,6 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 				}
 				break;
 		    }
-		}
-		break;
-
-		case NWK_LEAVE_STATE:
-		{
-
 		}
 		break;
 
@@ -1204,6 +1230,7 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 					s_network.currentEpid = 0;
 					PDM_vDeleteDataRecord(PDM_APP_ID_EPID);
 
+					s_network.isAuthenticated = FALSE;
 					s_network.rejoinStrikes = 0;
 				}
 				s_eDevice.currentState = PREP_TO_SLEEP_STATE;
@@ -1662,6 +1689,9 @@ PRIVATE void blacklistNetwork(void)
     blacklistEpids[ blacklistIndex++ ] = ZPS_u64AplZdoGetNetworkExtendedPanId();
 
     ZPS_eAplAibSetApsUseExtendedPanId(0);
+
+    s_network.isConnected = FALSE;
+    s_network.isAuthenticated = FALSE;
 
     /* Leave request */
     ZPS_teStatus status = ZPS_eAplZdoLeaveNetwork

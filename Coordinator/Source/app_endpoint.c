@@ -333,7 +333,7 @@ void ProcessUART()
         case '$':
         {
             // GO command
-            //	$aaaa,GO\n (a = last 4 of End Device MAC address)
+            // $aaaa,GO\n (a = last 4 of End Device MAC address)
             // send: $GO to addressed device
 
             uint16 destMacAddrStub = strtol( &uartRxBuffer[1], NULL, 16 );
