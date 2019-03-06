@@ -66,11 +66,10 @@
 #endif
 
 #define NO_NETWORK_SLEEP_DUR        10  // seconds
-#define WATCHDOG_TIMEOUT			10	// seconds
 #define MAX_REJOIN_STRIKES			100 // times
-#define MAX_SYSTEM_STRIKES			5	// times
 #define MAX_NO_NWK_STRIKES			3	// times (fixed by ZPS_Config Editor)
-#define MAX_AUTH_STRIKES			3	// times (fixed by ZPS_Config Editor)
+#define MAX_SYSTEM_STRIKES			5	// times
+#define MAX_AUTH_STRIKES			3	// times
 #define SECS_TO_TICKS(seconds)		seconds * 32768
 
 #define CONFIG_BUTTON_PIN			13
@@ -132,10 +131,6 @@ PRIVATE networkDesc_t s_network;
 tszQueue APP_msgStrainGaugeEvents;
 tszQueue APP_msgZpsEvents;
 
-PRIVATE uint8 watchdogTimer;
-PRIVATE uint8 authTimer;
-PRIVATE uint8 pollTimer;
-
 PRIVATE uint64 blacklistEpids[BLACKLIST_MAX] = { 0 };
 PRIVATE uint8  blacklistIndex = 0;
 PRIVATE tsBeaconFilterType discoverFilter;
@@ -151,20 +146,6 @@ PUBLIC void vWakeCallBack(void)
 	DBG_vPrintf(TRACE_APP, "\n\r\n\r*** WAKE UP ROUTINE ***\n\r");
 	DBG_vPrintf(TRACE_APP, "APP: WAKE_UP_STATE\n\r");
 	s_eDevice.currentState = WAKE_UP_STATE;
-}
-
-PUBLIC void watchdogCallback(void * params)
-{
-	ZTIMER_eStop( watchdogTimer );
-
-	s_eDevice.systemStrikes++;
-	DBG_vPrintf
-	(
-		TRACE_APP,
-		"APP: State machine timed out, strike = %d\n\r",
-		s_eDevice.systemStrikes
-	);
-	s_eDevice.currentState = PREP_TO_SLEEP_STATE;
 }
 
 /****************************************************************************
@@ -304,9 +285,6 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
     DBG_vPrintf(TRACE_APP, "  Channel B: %d\n\r", s_eDevice.channelBValue);
     DBG_vPrintf(TRACE_APP, "  Gain: %d\n\r", s_eDevice.gainValue);
 
-    /* Initialize Timers */
-    ZTIMER_eOpen(&watchdogTimer, watchdogCallback, NULL, ZTIMER_FLAG_ALLOW_SLEEP);
-
     /* Send DAC and OPAMP to low power */
 	ENABLE_3VLN();
 	ad8231_init();
@@ -345,14 +323,27 @@ PUBLIC void APP_vtaskSleepingEndDevice()
     /* State machine watchdog */
     if(s_eDevice.currentState != s_eDevice.previousState)
     {
-		ZTIMER_eStart (watchdogTimer, ZTIMER_TIME_SEC(WATCHDOG_TIMEOUT));
+    	timeout = 0;
     	s_eDevice.previousState = s_eDevice.currentState;
     }
+    else
+    {
+    	//TODO: Change timeout to a timer
+    	if (s_eDevice.currentState != SLEEP_STATE) timeout++;
+    	if (timeout >= 40000)
+    	{
+    		s_eDevice.systemStrikes++;
+    		DBG_vPrintf
+    		(
+    			TRACE_APP,
+    			"APP: State machine timed out, strike = %d\n\r",
+    			s_eDevice.systemStrikes
+    		);
+    		s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+    	}
+    }
 
-	if (s_eDevice.systemStrikes >= MAX_SYSTEM_STRIKES)
-	{
-		vAHI_SwReset();
-	}
+	if (s_eDevice.systemStrikes >= 5) vAHI_SwReset();
 
     /* Main State Machine */
     switch (s_eDevice.currentState)
@@ -683,8 +674,6 @@ PUBLIC void APP_vtaskSleepingEndDevice()
         {
         	DBG_vPrintf(TRACE_APP, "\n\rAPP: PREP_TO_SLEEP_STATE\n\r");
 
-        	ZTIMER_eStop( watchdogTimer );
-
 			if(s_eDevice.isConfigured && s_network.isConnected && s_network.isAuthenticated)
 				s_eDevice.sleepTime = s_eDevice.samplePeriod;
 			else s_eDevice.sleepTime = DEFAULT_SLEEP_TIME;
@@ -811,6 +800,8 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 				}
 		    	else
 		    	{
+		    		s_network.isAuthenticated = TRUE;
+
 		    		DBG_vPrintf(TRACE_APP, "\n\r  NWK: NWK_REJOIN_STATE\n\r");
 		    		s_network.currentState = NWK_REJOIN_STATE;
 		    	}
@@ -829,6 +820,15 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 				//ZPS_vNwkNibSetPanId(pvNwk, 0);
 				ZPS_vNwkNibSetExtPanId(pvNwk, 0);
 				ZPS_eAplAibSetApsUseExtendedPanId(0);
+
+				/* Set security keys */
+				ZPS_vAplSecSetInitialSecurityState
+				(
+					ZPS_ZDO_PRECONFIGURED_LINK_KEY,
+					au8DefaultTCLinkKey,
+					0x00,
+					ZPS_APS_GLOBAL_LINK_KEY
+				);
 
 		    	/* Start the network stack as a end device */
 				DBG_vPrintf(TRACE_APP, "  NWK: Starting ZPS\n\r");
@@ -1065,8 +1065,17 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 						{
 							/* Auth code not received, add EPID to blacklist */
 							blacklistNetwork();
+							s_eDevice.currentState = PREP_TO_SLEEP_STATE;
 						}
-						s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+						else
+						{
+							/* Send authentication request and wait for coordinator's response */
+							sendAuthReq();
+
+							DBG_vPrintf(TRACE_APP,"\n\rAPP: WAIT_CONFIRM_STATE\n\r");
+							s_eDevice.currentState = WAIT_CONFIRM_STATE;
+						}
+
 					}
 
 					/* Success */

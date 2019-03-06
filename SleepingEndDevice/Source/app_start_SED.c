@@ -367,7 +367,7 @@ PUBLIC void app_vMainloop(void)
         APP_vtaskSleepingEndDevice();
         ZTIMER_vTask();
         /* kick the watchdog timer */
-        vAHI_WatchdogRestart();
+		vAHI_WatchdogRestart();
         PWRM_vManagePower();
     }
 }
