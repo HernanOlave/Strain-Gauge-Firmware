@@ -897,8 +897,8 @@ PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent)
 							"  NWK: Network discovery failed, status = %d\n\r",
 							sStackEvent.uEvent.sNwkDiscoveryEvent.eStatus
 						);
-						//s_eDevice.currentState = PREP_TO_SLEEP_STATE;
-						//TODO: Handle error
+						s_eDevice.currentState = PREP_TO_SLEEP_STATE;
+
 					}
 					else /* Discovery process successful */
 					{
