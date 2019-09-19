@@ -40,6 +40,17 @@
 /***        Macro Definitions                                             ***/
 /****************************************************************************/
 
+/*
+ * DEVICE_TYPES
+ * 0 = NONE
+ * 1 = QB1C
+ * 2 = HB2C/QB2C
+ */
+#define DEVICE_TYPE		1
+
+#define VERSION_MAJOR	2
+#define VERSION_MINOR	2
+
 #define BLACKLIST_MAX   			32		// max number of blacklist EPIDs
 #define CHANNEL_A_DEFAULT_VALUE		2048	// DAC's channel A
 #define CHANNEL_B_DEFAULT_VALUE		2048	// DAC's channel B

@@ -141,9 +141,9 @@ PUBLIC void vAppMain(void)
     DBG_vUartInit(DBG_E_UART_0, DBG_E_UART_BAUD_RATE_115200);
     DBG_vPrintf(TRACE_APP, "\n\nAPP: Power Up\n");
 
-    DBG_vPrintf(TRACE_APP, "Version: %d.%d\n", VERSION_MAJOR, VERSION_MINOR);
+    DBG_vPrintf(TRACE_APP, "Device Type: %d\n", DEVICE_TYPE);
+    DBG_vPrintf(TRACE_APP, "FW Version: %d.%d\n", VERSION_MAJOR, VERSION_MINOR);
     DBG_vPrintf(TRACE_APP, "Built: %s %s\n\n", __DATE__, __TIME__);
-
 
 #if JENNIC_CHIP_FAMILY == JN516x
     /*

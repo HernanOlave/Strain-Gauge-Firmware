@@ -353,8 +353,11 @@ PUBLIC void APP_vtaskSleepingEndDevice()
     /* State machine watchdog */
     if(s_eDevice.currentState != s_eDevice.previousState)
     {
-    	ZTIMER_eStop(u8TimerWatchdog);
-    	ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
+    	if (s_eDevice.currentState != SLEEP_STATE)
+    	{
+    		ZTIMER_eStop(u8TimerWatchdog);
+    		ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
+    	}
     	s_eDevice.previousState = s_eDevice.currentState;
     }
 
@@ -693,7 +696,12 @@ PUBLIC void APP_vtaskSleepingEndDevice()
 				s_eDevice.sleepTime = s_eDevice.samplePeriod;
 			else s_eDevice.sleepTime = DEFAULT_SLEEP_TIME;
 
-			ZTIMER_eStop(u8TimerWatchdog);
+			DBG_vPrintf
+			(
+				TRACE_APP,
+				"APP: ZTIMER_eStop: %d\n\r",
+				ZTIMER_eStop(u8TimerWatchdog)
+			);
 
         	DBG_vPrintf
 			(
@@ -1590,10 +1598,13 @@ PRIVATE void sendBroadcast(void)
 		/* Load payload data into APDU */
 		byteCount = PDUM_u16APduInstanceWriteNBO
 		(
-			data,	// APDU instance handle
-			0,		// APDU position for data
-			"b",	// data format string
-			'&'
+			data,			// APDU instance handle
+			0,				// APDU position for data
+			"bbbb",			// data format string
+			'&',			// frame ID
+			DEVICE_TYPE,	// Device Type
+			VERSION_MAJOR,	// FW Version (major)
+			VERSION_MINOR	// FW Version (minor)
 		);
 
 		if( byteCount == 0 )
@@ -1808,145 +1819,3 @@ PUBLIC void APP_vGenCallback(uint8 u8Endpoint, ZPS_tsAfEvent *psStackEvent)
 /****************************************************************************/
 /***        END OF FILE                                                   ***/
 /****************************************************************************/
-
-
-/* TODO: errores registrados
- *
- * Despues de reprogamar el concentrador, todos los nodos previamente asociados "pierden" conexion. Despues de 3 intentos
- * el nodo "deja" la red y no puede volver a conectarse con rejoin. Hay que ver que pasa si se elimina el EPID.
- * Una teoria es que el feature de seguridad "frame counter" es el que rechaza mensajes del nodo.
- *
- **********************************************************************************************************************************
- *
- * Despues de ingresar a una red se genera uno o mas eventos ZPS_EVENT_NWK_POLL_CONFIRM con supuestamente data valida (MAC_ENUM_SUCCESS).
- * pero no se genera el evento ZPS_EVENT_APS_DATA_INDICATION, por lo cual no hay data que procesar en el endpoint. Por otro lado,
- * cuando un nodo ingresa a la red, el coordinador siempre arroja la siguiente secuencia:
- *
- * APP: No event to process
- * APP: vCheckStackEvent: vCheckStackEvent: ZPS_EVENT_NEW_NODE_HAS_JOINED, Nwk Addr=0x542b
- * APP: No event to process
- * APP: vCheckStackEvent: ZPS_EVENT_AF_DATA_INDICATION
- *        Profile :0
- *        Cluster :13
- *        EndPoint:0
- * APP: No event to process
- * APP: vCheckStackEvent: ZPS_EVENT_ROUTE_DISCOVERY_CFM
- *
- **********************************************************************************************************************************
- *
- * Cuando se realiza un pareamiento masivo, algunos nodos logran conectarse a la red, pero no enviar el comando broadcast.
- * De estos ultimos, algunos se recuperan y envian el comando broadcast despues de un reset, los otros aparecen como mensaje
- * de que se han unido a la red (puerta dbg coordinador) pero en la puerta dbg del nodo aparece:
- *
- * *** WAKE UP ROUTINE ***
- * APP: WAKE_UP_STATE
- *
- * APP: NETWORK_STATE
- *   NWK: NWK_STARTUP_STATE
- *   NWK: Starting ZPS
- *   NWK: Failed to Start Stack, status = 139
- *
- *   NWK: NWK_DISC_STATE
- *
- * APP: PREP_TO_SLEEP_STATE
- * APP: Sleep for 5 seconds
- *
- * el cual implica: ZPS_APL_ZDP_E_NOT_PERMITTED (0x8B) The device is not in the proper state to support the requested operation.
- * Al realizar un reset, se obtiene:
- *
- * APP: Startup
- * APP: Restoring application data from flash
- * APP: Device Information:
- *   MAC: 0x00158d0002a0c881
- *   EPID: 0x0000000000000000
- *   Sample Period: 10
- *   Configured Flag: 0
- *   Channel A: 2048
- *   Channel B: 2048
- *   Gain: 32
- *
- * APP: NETWORK_STATE
- *   NWK: NWK_STARTUP_STATE
- *   NWK: Starting ZPS
- *
- *   NWK: NWK_DISC_STATE
- *   NWK: New event on the stack APP_msgZpsEvents = 6
- *   NWK: Discovery unexpected event - 6
- *
- * Despues de iniciar un DISCOVERY, se genera evento ZPS_EVENT_NWK_JOINED_AS_ENDDEVICE.
- * Lo cual corresponde a un reingreso a la red, pero el dispositivo no fue capaz de guardar la EPID en flash
- *
- * Cuando el nodo intenta conectarse por primera vez, presenta el siguiente texto:
- *
- *   NWK: NWK_JOIN_STATE
- *   NWK: New event on the stack APP_msgZpsEvents = 15
- *   NWK: Join unexpected event - 15
- *
- *   15 = ZPS_EVENT_NWK_POLL_CONFIRM
- *
- * Posterior a esto, en los siguientes WAKEUP el dispositivo no es capaz de iniciar el Stack:
- *
- *   NWK: NWK_STARTUP_STATE
- *   NWK: New event on the stack APP_msgZpsEvents = 15
- *   NWK: Starting ZPS
- *   NWK: Failed to Start Stack, status = 139
- *
- *   status 139 = ZPS_APL_ZDP_E_NOT_PERMITTED (0x8B)
- *   event 15 = ZPS_EVENT_NWK_POLL_CONFIRM (0x0F)
- *
- * Mas info respecto a lo anterior:
- *
- * *** WAKE UP ROUTINE ***
-APP: WAKE_UP_STATE
-
-APP: NETWORK_STATE
-  NWK: NWK_STARTUP_STATE
-  NWK: Starting ZPS
-
-  NWK: NWK_DISC_STATE
-  NWK: New event on the stack APP_msgZpsEvents = 10
-  NWK: Network discovery complete
-  NWK: Found 1 networks
-  NWK: Joining network
-  NWK: Ext PAN ID = 0x00158d0001ba807a
-
-  NWK: NWK_JOIN_STATE
-  NWK: New event on the stack APP_msgZpsEvents = 8
-  NWK: Node failed to join network, status = 235
-APP: State machine timed out, strike = 1
-
-APP: PREP_TO_SLEEP_STATE
-APP: Sleep for 5 seconds
-
-
-*** WAKE UP ROUTINE ***
-APP: WAKE_UP_STATE
-
-APP: NETWORK_STATE
-  NWK: NWK_STARTUP_STATE
-  NWK: Starting ZPS
-
-  NWK: NWK_DISC_STATE
-  NWK: New event on the stack APP_msgZpsEvents = 10
-  NWK: Network discovery complete
-  NWK: Network discovery failed, status = 234
-APP: State machine timed out, strike = 2
-
-APP: PREP_TO_SLEEP_STATE
-APP: Sleep for 5 seconds
- *
- * status 234 = MAC_ENUM_NO_BEACON (0xEA)   Scan  failed to find any beacons
- * status 235 = MAC_ENUM_NO_DATA (0xEB)   No response data after a data request
- *
- * por otro lado, el coordinador responde lo siguiente:
- *
- * APP: vCheckStackEvent: ZPS_EVENT_NWK_STATUS_INDICATION
-    Address: 0xf8f0
-    Status : 17
- *
- **********************************************************************************************************************************
- *
- *
- *
- *
- */
