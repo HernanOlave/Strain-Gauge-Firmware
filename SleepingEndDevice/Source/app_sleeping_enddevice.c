@@ -86,6 +86,8 @@
 #define ENABLE_WB() 				vAHI_DioSetDirection(0x0,(1 << DIO11)); vAHI_DioSetOutput(0x0, (1 << DIO11));
 #define DISABLE_WB() 				vAHI_DioSetDirection(0x0,(1 << DIO11)); vAHI_DioSetOutput((1 << DIO11), 0x0);
 
+#define STATE_MACHINE_WDG_TIME		ZTIMER_TIME_MSEC(5000)
+
 /****************************************************************************/
 /***        Type Definitions                                              ***/
 /****************************************************************************/
@@ -119,6 +121,8 @@ PRIVATE uint16 getMedianAvg(uint8 adcChannel, uint8 samples);
 
 PUBLIC pwrm_tsWakeTimerEvent sWake;
 
+PUBLIC uint8 u8TimerWatchdog;
+
 /****************************************************************************/
 /***        Local Variables                                               ***/
 /****************************************************************************/
@@ -146,6 +150,30 @@ PUBLIC void vWakeCallBack(void)
 	DBG_vPrintf(TRACE_APP, "\n\r\n\r*** WAKE UP ROUTINE ***\n\r");
 	DBG_vPrintf(TRACE_APP, "APP: WAKE_UP_STATE\n\r");
 	s_eDevice.currentState = WAKE_UP_STATE;
+}
+
+/****************************************************************************
+ *
+ * NAME: APP_cbTimerButtonScan
+ *
+ * DESCRIPTION:
+ * Timer callback to debounce the button presses
+ *
+ * PARAMETER:
+ *
+ * RETURNS:
+ *
+ ****************************************************************************/
+PUBLIC void APP_cbTimerWatchdog(void *pvParam)
+{
+	s_eDevice.systemStrikes++;
+	DBG_vPrintf
+	(
+		TRACE_APP,
+		"APP: State machine timed out, strike = %d\n\r",
+		s_eDevice.systemStrikes
+	);
+	s_eDevice.currentState = PREP_TO_SLEEP_STATE;
 }
 
 /****************************************************************************
@@ -295,6 +323,8 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
 	ENABLE_POWERSAVE();
 	DISABLE_WB();
 
+	ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
+
     /* Always start on NETWORK STATE */
     DBG_vPrintf(TRACE_APP, "\n\rAPP: NETWORK_STATE\n\r");
     s_eDevice.currentState = NETWORK_STATE;
@@ -323,24 +353,9 @@ PUBLIC void APP_vtaskSleepingEndDevice()
     /* State machine watchdog */
     if(s_eDevice.currentState != s_eDevice.previousState)
     {
-    	timeout = 0;
+    	ZTIMER_eStop(u8TimerWatchdog);
+    	ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
     	s_eDevice.previousState = s_eDevice.currentState;
-    }
-    else
-    {
-    	//TODO: Change timeout to a timer
-    	if (s_eDevice.currentState != SLEEP_STATE) timeout++;
-    	if (timeout >= 40000)
-    	{
-    		s_eDevice.systemStrikes++;
-    		DBG_vPrintf
-    		(
-    			TRACE_APP,
-    			"APP: State machine timed out, strike = %d\n\r",
-    			s_eDevice.systemStrikes
-    		);
-    		s_eDevice.currentState = PREP_TO_SLEEP_STATE;
-    	}
     }
 
 	if (s_eDevice.systemStrikes >= 5) vAHI_SwReset();
@@ -678,6 +693,8 @@ PUBLIC void APP_vtaskSleepingEndDevice()
 				s_eDevice.sleepTime = s_eDevice.samplePeriod;
 			else s_eDevice.sleepTime = DEFAULT_SLEEP_TIME;
 
+			ZTIMER_eStop(u8TimerWatchdog);
+
         	DBG_vPrintf
 			(
 				TRACE_APP,
@@ -705,6 +722,8 @@ PUBLIC void APP_vtaskSleepingEndDevice()
 
         case WAKE_UP_STATE:
 		{
+			ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
+
 			if(s_network.isConnected && s_network.isAuthenticated)
 			{
 				/* Poll data from Stack */

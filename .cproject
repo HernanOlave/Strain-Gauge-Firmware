@@ -1,114 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <?fileVersion 4.0.0?><cproject storage_type_id="org.eclipse.cdt.core.XmlProjectDescriptionStorage">
 	<storageModule moduleId="org.eclipse.cdt.core.settings">
-		<cconfiguration id="com.beyondsemi.toolchain.gnu.ba.elf.base.908471266.1972708848">
-			<storageModule buildSystemId="org.eclipse.cdt.managedbuilder.core.configurationDataProvider" id="com.beyondsemi.toolchain.gnu.ba.elf.base.908471266.1972708848" moduleId="org.eclipse.cdt.core.settings" name="Coordinator">
-				<macros>
-					<stringMacro name="JENNIC_CHIP_NAME" type="VALUE_TEXT" value="_JN5168"/>
-				</macros>
-				<externalSettings/>
-				<extensions>
-					<extension id="org.eclipse.cdt.core.GmakeErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
-					<extension id="org.eclipse.cdt.core.CWDLocator" point="org.eclipse.cdt.core.ErrorParser"/>
-					<extension id="org.eclipse.cdt.core.GCCErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
-					<extension id="org.eclipse.cdt.core.GASErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
-					<extension id="org.eclipse.cdt.core.GLDErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
-					<extension id="org.eclipse.cdt.core.ELF" point="org.eclipse.cdt.core.BinaryParser"/>
-				</extensions>
-			</storageModule>
-			<storageModule moduleId="cdtBuildSystem" version="4.0.0">
-				<configuration artifactName="JN-AN-1229-ZPS-Application-Template" buildProperties="" description="Coordinator on JN5168-001-M06" id="com.beyondsemi.toolchain.gnu.ba.elf.base.908471266.1972708848" name="Coordinator" parent="org.eclipse.cdt.build.core.emptycfg">
-					<folderInfo id="com.beyondsemi.toolchain.gnu.ba.elf.base.908471266.1972708848." name="/" resourcePath="">
-						<toolChain id="com.beyondsemi.toolchain.gnu.ba.elf.base.206954981" name="BA ELF GNU toolchain" superClass="com.beyondsemi.toolchain.gnu.ba.elf.base">
-							<targetPlatform binaryParser="org.eclipse.cdt.core.ELF" id="com.beyondsemi.target.gnu.platform.ba.elf.1405811350" superClass="com.beyondsemi.target.gnu.platform.ba.elf"/>
-							<builder arguments="JENNIC_CHIP=JN5168 JENNIC_CHIP_FAMILY=JN516x MODULE=M06 SBC_UART_DISABLE=FALSE" buildPath="${ProjDirPath}/Coordinator/Build" command="make" id="com.beyondsemi.builder.cdt.gnu.580451490" keepEnvironmentInBuildfile="false" managedBuildOn="false" name="Gnu Make Builder" superClass="com.beyondsemi.builder.cdt.gnu"/>
-							<tool id="com.beyondsemi.tool.gnu.ba.elf.compiler.c.base.1339147658" name="BA ELF GNU C compiler" superClass="com.beyondsemi.tool.gnu.ba.elf.compiler.c.base">
-								<option id="gnu.c.compiler.option.include.paths.463311809" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" valueType="includePath">
-									<listOptionValue builtIn="false" value="&quot;C:\NXP\bstudio_nxp\sdk\JN-SW-4170\Components\ZigbeeCommon\Include&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;C:\NXP\bstudio_nxp\sdk\JN-SW-4170\Components\Common\Include&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;C:\NXP\bstudio_nxp\sdk\JN-SW-4170\Components\DBG\Include&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;C:\NXP\bstudio_nxp\sdk\JN-SW-4170\Components\PDM\Include&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;C:\NXP\bstudio_nxp\sdk\JN-SW-4170\Components\PWRM\Include&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;C:\NXP\bstudio_nxp\sdk\JN-SW-4170\Components\ZPSAPL\Include&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;C:\NXP\bstudio_nxp\sdk\JN-SW-4170\Components\AppApi\Include&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;C:\NXP\bstudio_nxp\sdk\JN-SW-4170\Components\HardwareAPI\Include&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;C:\NXP\bstudio_nxp\sdk\JN-SW-4170\Components\ZPSMAC\Include&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;C:\NXP\bstudio_nxp\sdk\JN-SW-4170\Components\ZPSNWK\Include&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;C:\NXP\bstudio_nxp\sdk\JN-SW-4170\Components\PDUM\Include&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;C:\NXP\bstudio_nxp\sdk\JN-SW-4170\Components\MAC\Include&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;C:\NXP\bstudio_nxp\sdk\JN-SW-4170\Components\Aes\Include&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;C:\NXP\bstudio_nxp\sdk\JN-SW-4170\Components\AES_SW\Include&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;C:\NXP\bstudio_nxp\sdk\JN-SW-4170\Components\TimerServer\Include&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;C:\NXP\bstudio_nxp\sdk\JN-SW-4170\Components\ZPSTSV\Include&quot;"/>
-								</option>
-								<option id="gnu.c.compiler.option.preprocessor.def.symbols.2120389015" name="Defined symbols (-D)" superClass="gnu.c.compiler.option.preprocessor.def.symbols" valueType="definedSymbols">
-									<listOptionValue builtIn="false" value="JENNIC_CHIP_NAME=_JN5168"/>
-									<listOptionValue builtIn="false" value="JENNIC_CHIP_FAMILY_JN516x"/>
-									<listOptionValue builtIn="false" value="JENNIC_CHIP_FAMILY=JN516x"/>
-									<listOptionValue builtIn="false" value="JENNIC_CHIP=JN5168"/>
-									<listOptionValue builtIn="false" value="TRACE=1"/>
-									<listOptionValue builtIn="false" value="JENNIC_SDK=JN-SW-4170"/>
-									<listOptionValue builtIn="false" value="ENDIAN=BIG_ENDIAN"/>
-									<listOptionValue builtIn="false" value="SBC_UART_DISABLE=0"/>
-								</option>
-								<option id="gnu.c.compiler.option.preprocessor.undef.symbol.1426774151" name="Undefined symbols (-U)" superClass="gnu.c.compiler.option.preprocessor.undef.symbol"/>
-								<inputType id="com.beyondsemi.base.ba.elf.c.compiler.input.1465051267" superClass="com.beyondsemi.base.ba.elf.c.compiler.input"/>
-								<inputType id="com.beyondsemi.assembler.macro.input.1724004642" superClass="com.beyondsemi.assembler.macro.input"/>
-							</tool>
-							<tool id="com.beyondsemi.tool.gnu.ba.elf.compiler.cpp.base.116833503" name="BA ELF GNU C++ compiler" superClass="com.beyondsemi.tool.gnu.ba.elf.compiler.cpp.base">
-								<inputType id="com.beyondsemi.base.ba.elf.cpp.compiler.input.812782201" superClass="com.beyondsemi.base.ba.elf.cpp.compiler.input"/>
-							</tool>
-							<tool id="com.beyondsemi.tool.gnu.ba.elf.linker.c.base.1971522124" name="BA ELF GNU C linker" superClass="com.beyondsemi.tool.gnu.ba.elf.linker.c.base"/>
-							<tool id="com.beyondsemi.tool.gnu.ba.elf.linker.cpp.base.1605438688" name="BA ELF GNU C++ linker" superClass="com.beyondsemi.tool.gnu.ba.elf.linker.cpp.base">
-								<inputType id="cdt.managedbuild.tool.gnu.cpp.linker.input.632927368" superClass="cdt.managedbuild.tool.gnu.cpp.linker.input">
-									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
-									<additionalInput kind="additionalinput" paths="$(LIBS)"/>
-								</inputType>
-							</tool>
-							<tool id="com.beyondsemi.tool.gnu.ba.elf.assembler.base.240540434" name="BA ELF GNU assembler" superClass="com.beyondsemi.tool.gnu.ba.elf.assembler.base">
-								<inputType id="cdt.managedbuild.tool.gnu.assembler.input.2106557297" superClass="cdt.managedbuild.tool.gnu.assembler.input"/>
-								<inputType id="com.beyondsemi.assembler.input.1405204849" superClass="com.beyondsemi.assembler.input"/>
-							</tool>
-							<tool id="com.beyondsemi.tool.gnu.ba.elf.archiver.base.733855597" name="BA ELF GNU archiver" superClass="com.beyondsemi.tool.gnu.ba.elf.archiver.base"/>
-							<tool id="com.beyondsemi.tool.gnu.ba.elf.size.base.1694060689" name="BA ELF GNU size" superClass="com.beyondsemi.tool.gnu.ba.elf.size.base"/>
-							<tool id="com.beyondsemi.tool.gnu.ba.elf.objcopy.base.1795594984" name="BA ELF GNU objcopy" superClass="com.beyondsemi.tool.gnu.ba.elf.objcopy.base"/>
-						</toolChain>
-					</folderInfo>
-					<folderInfo id="com.beyondsemi.toolchain.gnu.ba.elf.base.908471266.1972708848.784298705" name="/" resourcePath="Coordinator">
-						<toolChain id="com.beyondsemi.toolchain.gnu.ba.elf.base.887295062" name="BA ELF GNU toolchain" superClass="com.beyondsemi.toolchain.gnu.ba.elf.base" unusedChildren="">
-							<targetPlatform binaryParser="org.eclipse.cdt.core.ELF" id="com.beyondsemi.target.gnu.platform.ba.elf" superClass="com.beyondsemi.target.gnu.platform.ba.elf"/>
-							<tool id="com.beyondsemi.tool.gnu.ba.elf.compiler.c.base.1521128067" name="BA ELF GNU C compiler" superClass="com.beyondsemi.tool.gnu.ba.elf.compiler.c.base.1339147658">
-								<option id="gnu.c.compiler.option.preprocessor.def.symbols.1136402783" name="Defined symbols (-D)" superClass="gnu.c.compiler.option.preprocessor.def.symbols" valueType="definedSymbols">
-									<listOptionValue builtIn="false" value="JENNIC_CHIP_NAME=_JN5168"/>
-									<listOptionValue builtIn="false" value="JENNIC_CHIP_FAMILY_JN516x"/>
-									<listOptionValue builtIn="false" value="JENNIC_CHIP_FAMILY=JN516x"/>
-									<listOptionValue builtIn="false" value="JENNIC_CHIP=JN5168"/>
-									<listOptionValue builtIn="false" value="TRACE=1"/>
-									<listOptionValue builtIn="false" value="JENNIC_SDK=JN-SW-4170"/>
-									<listOptionValue builtIn="false" value="ENDIAN=BIG_ENDIAN"/>
-									<listOptionValue builtIn="false" value="SBC_UART_DISABLE=0"/>
-								</option>
-								<inputType id="com.beyondsemi.base.ba.elf.c.compiler.input.694644854" superClass="com.beyondsemi.base.ba.elf.c.compiler.input"/>
-								<inputType id="com.beyondsemi.assembler.macro.input.1920942449" superClass="com.beyondsemi.assembler.macro.input"/>
-							</tool>
-							<tool id="com.beyondsemi.tool.gnu.ba.elf.compiler.cpp.base.321379721" name="BA ELF GNU C++ compiler" superClass="com.beyondsemi.tool.gnu.ba.elf.compiler.cpp.base.116833503">
-								<inputType id="com.beyondsemi.base.ba.elf.cpp.compiler.input.1099335793" superClass="com.beyondsemi.base.ba.elf.cpp.compiler.input"/>
-							</tool>
-							<tool id="com.beyondsemi.tool.gnu.ba.elf.linker.c.base.780210098" name="BA ELF GNU C linker" superClass="com.beyondsemi.tool.gnu.ba.elf.linker.c.base.1971522124"/>
-							<tool id="com.beyondsemi.tool.gnu.ba.elf.linker.cpp.base.272985472" name="BA ELF GNU C++ linker" superClass="com.beyondsemi.tool.gnu.ba.elf.linker.cpp.base.1605438688"/>
-							<tool id="com.beyondsemi.tool.gnu.ba.elf.assembler.base.596106814" name="BA ELF GNU assembler" superClass="com.beyondsemi.tool.gnu.ba.elf.assembler.base.240540434">
-								<inputType id="cdt.managedbuild.tool.gnu.assembler.input.1606334023" superClass="cdt.managedbuild.tool.gnu.assembler.input"/>
-								<inputType id="com.beyondsemi.assembler.input.1225731999" superClass="com.beyondsemi.assembler.input"/>
-							</tool>
-							<tool id="com.beyondsemi.tool.gnu.ba.elf.archiver.base.809983741" name="BA ELF GNU archiver" superClass="com.beyondsemi.tool.gnu.ba.elf.archiver.base.733855597"/>
-							<tool id="com.beyondsemi.tool.gnu.ba.elf.size.base.1797205689" name="BA ELF GNU size" superClass="com.beyondsemi.tool.gnu.ba.elf.size.base.1694060689"/>
-							<tool id="com.beyondsemi.tool.gnu.ba.elf.objcopy.base.1552122159" name="BA ELF GNU objcopy" superClass="com.beyondsemi.tool.gnu.ba.elf.objcopy.base.1795594984"/>
-						</toolChain>
-					</folderInfo>
-				</configuration>
-			</storageModule>
-			<storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
-		</cconfiguration>
 		<cconfiguration id="com.beyondsemi.toolchain.gnu.ba.elf.base.908471266.744102389">
 			<storageModule buildSystemId="org.eclipse.cdt.managedbuilder.core.configurationDataProvider" id="com.beyondsemi.toolchain.gnu.ba.elf.base.908471266.744102389" moduleId="org.eclipse.cdt.core.settings" name="SleepingEndDevice">
 				<externalSettings/>
@@ -168,7 +60,7 @@
 							</tool>
 							<tool id="com.beyondsemi.tool.gnu.ba.elf.linker.c.base.1204904590" name="BA ELF GNU C linker" superClass="com.beyondsemi.tool.gnu.ba.elf.linker.c.base"/>
 							<tool id="com.beyondsemi.tool.gnu.ba.elf.linker.cpp.base.136862221" name="BA ELF GNU C++ linker" superClass="com.beyondsemi.tool.gnu.ba.elf.linker.cpp.base">
-								<option id="gnu.cpp.link.option.paths.668403792" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" valueType="libPaths"/>
+								<option id="gnu.cpp.link.option.paths.668403792" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths"/>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.linker.input.283770015" superClass="cdt.managedbuild.tool.gnu.cpp.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
 									<additionalInput kind="additionalinput" paths="$(LIBS)"/>
@@ -181,6 +73,18 @@
 							<tool id="com.beyondsemi.tool.gnu.ba.elf.archiver.base.1649255557" name="BA ELF GNU archiver" superClass="com.beyondsemi.tool.gnu.ba.elf.archiver.base"/>
 							<tool id="com.beyondsemi.tool.gnu.ba.elf.size.base.1620114741" name="BA ELF GNU size" superClass="com.beyondsemi.tool.gnu.ba.elf.size.base"/>
 							<tool id="com.beyondsemi.tool.gnu.ba.elf.objcopy.base.2120410112" name="BA ELF GNU objcopy" superClass="com.beyondsemi.tool.gnu.ba.elf.objcopy.base"/>
+						</toolChain>
+					</folderInfo>
+					<folderInfo id="com.beyondsemi.toolchain.gnu.ba.elf.base.908471266.744102389.197920223" name="/" resourcePath="SleepingEndDevice">
+						<toolChain id="com.beyondsemi.toolchain.gnu.ba.elf.base.723383938" name="BA ELF GNU toolchain" superClass="com.beyondsemi.toolchain.gnu.ba.elf.base" unusedChildren="">
+							<tool id="com.beyondsemi.tool.gnu.ba.elf.compiler.c.base.527239881" name="BA ELF GNU C compiler" superClass="com.beyondsemi.tool.gnu.ba.elf.compiler.c.base.2122900452"/>
+							<tool id="com.beyondsemi.tool.gnu.ba.elf.compiler.cpp.base.1819962397" name="BA ELF GNU C++ compiler" superClass="com.beyondsemi.tool.gnu.ba.elf.compiler.cpp.base.589527104"/>
+							<tool id="com.beyondsemi.tool.gnu.ba.elf.linker.c.base.1691178044" name="BA ELF GNU C linker" superClass="com.beyondsemi.tool.gnu.ba.elf.linker.c.base.1204904590"/>
+							<tool id="com.beyondsemi.tool.gnu.ba.elf.linker.cpp.base.850625928" name="BA ELF GNU C++ linker" superClass="com.beyondsemi.tool.gnu.ba.elf.linker.cpp.base.136862221"/>
+							<tool id="com.beyondsemi.tool.gnu.ba.elf.assembler.base.1786844925" name="BA ELF GNU assembler" superClass="com.beyondsemi.tool.gnu.ba.elf.assembler.base.1497724038"/>
+							<tool id="com.beyondsemi.tool.gnu.ba.elf.archiver.base.1567488391" name="BA ELF GNU archiver" superClass="com.beyondsemi.tool.gnu.ba.elf.archiver.base.1649255557"/>
+							<tool id="com.beyondsemi.tool.gnu.ba.elf.size.base.662776474" name="BA ELF GNU size" superClass="com.beyondsemi.tool.gnu.ba.elf.size.base.1620114741"/>
+							<tool id="com.beyondsemi.tool.gnu.ba.elf.objcopy.base.231685711" name="BA ELF GNU objcopy" superClass="com.beyondsemi.tool.gnu.ba.elf.objcopy.base.2120410112"/>
 						</toolChain>
 					</folderInfo>
 				</configuration>

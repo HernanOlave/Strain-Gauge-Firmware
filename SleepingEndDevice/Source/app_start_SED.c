@@ -102,6 +102,9 @@ PRIVATE bool_t wakeup = FALSE;
 /****************************************************************************/
 /***        Exported Variables                                            ***/
 /****************************************************************************/
+
+PUBLIC uint8 u8TimerWatchdog;
+
 bool_t configPressed_sed = FALSE;
 bool_t configPressed_ep  = FALSE;
 
@@ -111,6 +114,8 @@ bool_t configPressed_ep  = FALSE;
 extern void vAHI_WatchdogRestart(void);
 extern void PWRM_vManagePower(void);
 extern void zps_taskZPS(void);
+
+PUBLIC void APP_cbTimerWatchdog(void *pvParam);
 
 /****************************************************************************
  *
@@ -333,6 +338,9 @@ PUBLIC void APP_vInitResources(void)
 {
     /* Initialise the Z timer module */
     ZTIMER_eInit(asTimers, sizeof(asTimers) / sizeof(ZTIMER_tsTimer));
+
+    /* Create Z timers */
+    ZTIMER_eOpen(&u8TimerWatchdog,    APP_cbTimerWatchdog,  NULL, ZTIMER_FLAG_PREVENT_SLEEP);
 
     ZQ_vQueueCreate(&zps_msgMlmeDcfmInd,         MLME_QUEQUE_SIZE,      sizeof(MAC_tsMlmeVsDcfmInd), (uint8*)asMacMlmeVsDcfmInd);
     ZQ_vQueueCreate(&zps_msgMcpsDcfmInd,         MCPS_QUEUE_SIZE,       sizeof(MAC_tsMcpsVsDcfmInd), (uint8*)asMacMcpsDcfmInd);
