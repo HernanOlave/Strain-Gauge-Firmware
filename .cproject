@@ -60,7 +60,9 @@
 							</tool>
 							<tool id="com.beyondsemi.tool.gnu.ba.elf.linker.c.base.1204904590" name="BA ELF GNU C linker" superClass="com.beyondsemi.tool.gnu.ba.elf.linker.c.base"/>
 							<tool id="com.beyondsemi.tool.gnu.ba.elf.linker.cpp.base.136862221" name="BA ELF GNU C++ linker" superClass="com.beyondsemi.tool.gnu.ba.elf.linker.cpp.base">
-								<option id="gnu.cpp.link.option.paths.668403792" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths"/>
+								<option id="gnu.cpp.link.option.paths.668403792" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" valueType="libPaths">
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/nd005-firmware/SleepingEndDevice/Source/lib}&quot;"/>
+								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.linker.input.283770015" superClass="cdt.managedbuild.tool.gnu.cpp.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
 									<additionalInput kind="additionalinput" paths="$(LIBS)"/>
@@ -73,18 +75,6 @@
 							<tool id="com.beyondsemi.tool.gnu.ba.elf.archiver.base.1649255557" name="BA ELF GNU archiver" superClass="com.beyondsemi.tool.gnu.ba.elf.archiver.base"/>
 							<tool id="com.beyondsemi.tool.gnu.ba.elf.size.base.1620114741" name="BA ELF GNU size" superClass="com.beyondsemi.tool.gnu.ba.elf.size.base"/>
 							<tool id="com.beyondsemi.tool.gnu.ba.elf.objcopy.base.2120410112" name="BA ELF GNU objcopy" superClass="com.beyondsemi.tool.gnu.ba.elf.objcopy.base"/>
-						</toolChain>
-					</folderInfo>
-					<folderInfo id="com.beyondsemi.toolchain.gnu.ba.elf.base.908471266.744102389.197920223" name="/" resourcePath="SleepingEndDevice">
-						<toolChain id="com.beyondsemi.toolchain.gnu.ba.elf.base.723383938" name="BA ELF GNU toolchain" superClass="com.beyondsemi.toolchain.gnu.ba.elf.base" unusedChildren="">
-							<tool id="com.beyondsemi.tool.gnu.ba.elf.compiler.c.base.527239881" name="BA ELF GNU C compiler" superClass="com.beyondsemi.tool.gnu.ba.elf.compiler.c.base.2122900452"/>
-							<tool id="com.beyondsemi.tool.gnu.ba.elf.compiler.cpp.base.1819962397" name="BA ELF GNU C++ compiler" superClass="com.beyondsemi.tool.gnu.ba.elf.compiler.cpp.base.589527104"/>
-							<tool id="com.beyondsemi.tool.gnu.ba.elf.linker.c.base.1691178044" name="BA ELF GNU C linker" superClass="com.beyondsemi.tool.gnu.ba.elf.linker.c.base.1204904590"/>
-							<tool id="com.beyondsemi.tool.gnu.ba.elf.linker.cpp.base.850625928" name="BA ELF GNU C++ linker" superClass="com.beyondsemi.tool.gnu.ba.elf.linker.cpp.base.136862221"/>
-							<tool id="com.beyondsemi.tool.gnu.ba.elf.assembler.base.1786844925" name="BA ELF GNU assembler" superClass="com.beyondsemi.tool.gnu.ba.elf.assembler.base.1497724038"/>
-							<tool id="com.beyondsemi.tool.gnu.ba.elf.archiver.base.1567488391" name="BA ELF GNU archiver" superClass="com.beyondsemi.tool.gnu.ba.elf.archiver.base.1649255557"/>
-							<tool id="com.beyondsemi.tool.gnu.ba.elf.size.base.662776474" name="BA ELF GNU size" superClass="com.beyondsemi.tool.gnu.ba.elf.size.base.1620114741"/>
-							<tool id="com.beyondsemi.tool.gnu.ba.elf.objcopy.base.231685711" name="BA ELF GNU objcopy" superClass="com.beyondsemi.tool.gnu.ba.elf.objcopy.base.2120410112"/>
 						</toolChain>
 					</folderInfo>
 				</configuration>
@@ -101,10 +91,10 @@
 			<resource resourceType="PROJECT" workspacePath="/JN-AN-1229-ZPS-Application-Template"/>
 		</configuration>
 		<configuration configurationName="SleepingEndDevice"/>
+		<configuration configurationName="Coordinator"/>
 		<configuration configurationName="Router">
 			<resource resourceType="PROJECT" workspacePath="/JN-AN-1229-ZPS-Application-Template"/>
 		</configuration>
-		<configuration configurationName="Coordinator"/>
 	</storageModule>
 	<storageModule moduleId="com.crt.config">
 		<projectStorage>&lt;?xml version="1.0" encoding="UTF-8"?&gt;&#13;

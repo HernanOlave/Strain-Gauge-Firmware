@@ -156,6 +156,7 @@ APPSRC += app_pdm.c
 APPSRC += mcp3204.c
 APPSRC += ad8231.c
 APPSRC += ltc1661.c
+APPSRC += nwk_api.c
 
 APP_ZPSCFG = ZBProApp.zpscfg
 ##############################################################################
