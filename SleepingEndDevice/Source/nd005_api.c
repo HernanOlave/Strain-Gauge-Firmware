@@ -1,37 +1,12 @@
-/*****************************************************************************
+/**
+ * @file nd005_api.c
+ * @brief
  *
- * MODULE:				JN-AN-1184 ZigBeePro Application Template
+ * @author Wisely SpA
+ * @date 22-Sep-19
  *
- * COMPONENT:			app_sleeping_enddevice.c
- *
- * DESCRIPTION:			Sleeping EndDevice Application
- *
- *****************************************************************************
- *
- * This software is owned by NXP B.V. and/or its supplier and is protected
- * under applicable copyright laws. All rights are reserved. We grant You,
- * and any third parties, a license to use this software solely and
- * exclusively on NXP products [NXP Microcontrollers such as JN5169, JN5168,
- * JN5164, JN5161].
- * You, and any third parties must reproduce the copyright and warranty notice
- * and any other legend of ownership on each copy or partial copy of the
- * software.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- *
- * Copyright NXP B.V. 2015. All rights reserved
- *
- ****************************************************************************/
+ */
+
 /****************************************************************************/
 /***        Include files                                                 ***/
 /****************************************************************************/
@@ -65,27 +40,9 @@
 	#define TRACE_APP 	TRUE
 #endif
 
-#define NO_NETWORK_SLEEP_DUR        10  // seconds
-#define MAX_REJOIN_STRIKES			100 // times
-
 #define MAX_SYSTEM_STRIKES			5	// times
 #define MAX_AUTH_STRIKES			3	// times
 #define SECS_TO_TICKS(seconds)		seconds * 32768
-
-#define CONFIG_BUTTON_PIN			13
-
-#define DIO17						17
-#define ENABLE_3VLN() 				vAHI_DioSetDirection(0x0,(1 << DIO17)); vAHI_DioSetOutput((1 << DIO17), 0x0);
-#define DISABLE_3VLN() 				vAHI_DioSetDirection(0x0,(1 << DIO17)); vAHI_DioSetOutput(0x0, (1 << DIO17));
-
-#define DIO12						12
-#define ENABLE_POWERSAVE() 			vAHI_DioSetDirection(0x0,(1 << DIO12)); vAHI_DioSetOutput(0x0, (1 << DIO12));
-#define DISABLE_POWERSAVE() 		vAHI_DioSetDirection(0x0,(1 << DIO12)); vAHI_DioSetOutput((1 << DIO12), 0x0);
-
-#define DIO11						11
-#define ENABLE_WB() 				vAHI_DioSetDirection(0x0,(1 << DIO11)); vAHI_DioSetOutput(0x0, (1 << DIO11));
-#define DISABLE_WB() 				vAHI_DioSetDirection(0x0,(1 << DIO11)); vAHI_DioSetOutput((1 << DIO11), 0x0);
-
 #define STATE_MACHINE_WDG_TIME		ZTIMER_TIME_MSEC(5000)
 
 /****************************************************************************/
@@ -96,18 +53,11 @@
 /***        Local Function Prototypes                                     ***/
 /****************************************************************************/
 
-PRIVATE void vHandleNetwork(ZPS_tsAfEvent sStackEvent);
-PRIVATE frameReturnValues_t vHandleIncomingFrame(ZPS_tsAfEvent sStackEvent);
-PRIVATE void sendBroadcast(void);
-PRIVATE void sendAuthReq(void);
-PRIVATE uint16 getMedianAvg(uint8 adcChannel, uint8 samples);
-
 /****************************************************************************/
 /***        Exported Variables                                            ***/
 /****************************************************************************/
 
 PUBLIC pwrm_tsWakeTimerEvent sWake;
-
 PUBLIC uint8 u8TimerWatchdog;
 
 /****************************************************************************/
@@ -115,9 +65,6 @@ PUBLIC uint8 u8TimerWatchdog;
 /****************************************************************************/
 
 PRIVATE seDeviceDesc_t s_eDevice;
-
-
-uint32 timeout;
 
 /****************************************************************************/
 /***        Exported Functions                                            ***/
@@ -195,14 +142,6 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
 		blacklistIndex = 0;
     }
 
-    /* Load default values on startup */
-    s_network.currentEpid = 0;
-    s_network.isConnected = FALSE;
-    s_network.isAuthenticated = FALSE;
-    s_network.ackStrikes = 0;
-    s_network.noNwkStrikes = 0;
-    s_network.rejoinStrikes = 0;
-
     s_eDevice.systemStrikes = 0;
     s_eDevice.isConfigured = FALSE;
     s_eDevice.samplePeriod = DEFAULT_SAMPLE_PERIOD;
@@ -211,23 +150,24 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
     s_eDevice.gainValue = GAIN_DEFAULT_VALUE;
     s_eDevice.sleepTime = DEFAULT_SLEEP_TIME;
 
-    timeout = 0;
-
     /* Restore any application data previously saved to flash
      * All Application records must be loaded before the call to
      * ZPS_eAplAfInit
      */
     uint16 u16DataBytesRead;
+    uint64 epidBuffer;
 
     DBG_vPrintf(TRACE_APP, "APP: Restoring application data from flash\n\r");
 
     PDM_eReadDataFromRecord
     (
     	PDM_APP_ID_EPID,
-        &s_network.currentEpid,
-        sizeof(s_network.currentEpid),
+        &epidBuffer,
+        sizeof(epidBuffer),
         &u16DataBytesRead
     );
+
+    nwk_api_setEpid(epidBuffer);
 
     PDM_eReadDataFromRecord
 	(
@@ -270,21 +210,12 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
 		);
     }
 
-    /* Initialize ZBPro stack */
-    ZPS_eAplAfInit();
-
-    /* Set security keys */
-    ZPS_vAplSecSetInitialSecurityState
-    (
-    	ZPS_ZDO_PRECONFIGURED_LINK_KEY,
-        au8DefaultTCLinkKey,
-        0x00,
-        ZPS_APS_GLOBAL_LINK_KEY
-    );
+    /* Initialize network API */
+    nwk_api_init();
 
     DBG_vPrintf(TRACE_APP, "APP: Device Information:\n\r");
     DBG_vPrintf(TRACE_APP, "  MAC: 0x%016llx\n\r", ZPS_u64AplZdoGetIeeeAddr());
-    DBG_vPrintf(TRACE_APP, "  EPID: 0x%016llx\n\r", s_network.currentEpid);
+    DBG_vPrintf(TRACE_APP, "  EPID: 0x%016llx\n\r", nwk_api_getEpid());
     DBG_vPrintf(TRACE_APP, "  Sample Period: %d\n\r", s_eDevice.samplePeriod);
     DBG_vPrintf(TRACE_APP, "  Configured Flag: %d\n\r", s_eDevice.isConfigured);
     DBG_vPrintf(TRACE_APP, "  Channel A: %d\n\r", s_eDevice.channelAValue);
@@ -306,10 +237,6 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
     /* Always start on NETWORK STATE */
     DBG_vPrintf(TRACE_APP, "\n\rAPP: NETWORK_STATE\n\r");
     s_eDevice.currentState = NETWORK_STATE;
-
-    /* Always start on NETWORK STARTUP STATE */
-    DBG_vPrintf(TRACE_APP, "  NWK: NWK_STARTUP_STATE\n\r");
-    s_network.currentState = NWK_STARTUP_STATE;
 }
 
 /****************************************************************************
@@ -322,414 +249,7 @@ PUBLIC void APP_vInitialiseSleepingEndDevice(void)
  * RETURNS:
  * void
  *
- ****************************************************************************/
-PUBLIC void APP_vtaskSleepingEndDevice()
-{
-    /* State machine watchdog */
-    if(s_eDevice.currentState != s_eDevice.previousState)
-    {
-    	if (s_eDevice.currentState != SLEEP_STATE)
-    	{
-    		ZTIMER_eStop(u8TimerWatchdog);
-    		ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
-    	}
-    	s_eDevice.previousState = s_eDevice.currentState;
-    }
 
-	if (s_eDevice.systemStrikes >= 5) vAHI_SwReset();
-
-    /* Main State Machine */
-    switch (s_eDevice.currentState)
-    {
-        case NETWORK_STATE:
-        {
-
-
-        	if(s_network.isConnected && s_network.isAuthenticated)
-        	{
-        		DBG_vPrintf(TRACE_APP, "APP: Device is connected\n\r");
-
-        		s_network.noNwkStrikes = 0;
-        		s_network.rejoinStrikes = 0;
-        		s_network.authStrikes = 0;
-
-        		/* Send broadcast and wait for confirmation */
-        		sendBroadcast();
-
-        		DBG_vPrintf(TRACE_APP, "\n\rAPP: WAIT_CONFIRM_STATE\n\r");
-        		s_eDevice.currentState = WAIT_CONFIRM_STATE;
-        	}
-        }
-        break;
-
-        case POLL_DATA_STATE:
-        {
-        	/* Check if there is any event on the stack */
-			if (ZQ_bQueueReceive(&APP_msgZpsEvents, &sStackEvent))
-			{
-				DBG_vPrintf
-				(
-					TRACE_APP,
-					"  NWK: New event on the stack APP_msgZpsEvents = %d\n\r",
-					sStackEvent.eType
-				);
-			}
-
-			else if (ZQ_bQueueReceive(&APP_msgStrainGaugeEvents, &sStackEvent))
-			{
-				DBG_vPrintf
-				(
-					TRACE_APP,
-					"  NWK: New event on the stack APP_msgStrainGaugeEvents = %d\n\r",
-					sStackEvent.eType
-				);
-			}
-
-        	switch (sStackEvent.eType)
-			{
-				case ZPS_EVENT_NONE: break;
-
-				/* Poll request completed */
-				case ZPS_EVENT_NWK_POLL_CONFIRM:
-				{
-					uint8 eStatus;
-					eStatus = sStackEvent.uEvent.sNwkPollConfirmEvent.u8Status;
-
-					DBG_vPrintf
-					(
-						TRACE_APP,
-						"  NWK: ZPS_EVENT_NEW_POLL_COMPLETE, status = %d\n\r",
-						eStatus
-					);
-
-					/* No new data */
-					if(eStatus == MAC_ENUM_NO_DATA)
-					{
-						DBG_vPrintf(TRACE_APP,"  NWK: No new Data\n\r");
-
-						if(s_eDevice.isConfigured)
-						{
-							DBG_vPrintf(TRACE_APP, "\n\rAPP: SEND_DATA_STATE\n\r");
-							s_eDevice.currentState = SEND_DATA_STATE;
-						}
-						else
-						{
-							s_eDevice.currentState = PREP_TO_SLEEP_STATE;
-						}
-					}
-
-					/* Success */
-					else if(eStatus == MAC_ENUM_SUCCESS)
-					{
-						DBG_vPrintf(TRACE_APP,"  NWK: MAC_ENUM_SUCCESS\n\r");
-					}
-
-					/* No acknowledge */
-					else if(eStatus == MAC_ENUM_NO_ACK)
-					{
-						/* add 1 strike */
-						s_network.noNwkStrikes++;
-						DBG_vPrintf
-						(
-							TRACE_APP,
-							"  NWK: No Acknowledge received, strike = %d\n\r",
-							s_network.noNwkStrikes
-						);
-
-						/* if 3 strikes node loses connection */
-						if(s_network.noNwkStrikes >= MAX_NO_NWK_STRIKES)
-						{
-							s_network.noNwkStrikes = 0;
-							s_network.isConnected = FALSE;
-							DBG_vPrintf(TRACE_APP,"  NWK: Connection lost\n\r");
-						}
-
-						s_eDevice.currentState = PREP_TO_SLEEP_STATE;
-					}
-					else /* unexpected status */
-					{
-						DBG_vPrintf
-						(
-							TRACE_APP,
-							"  NWK: Unexpected poll complete, status = %d\n\r",
-							eStatus
-						);
-						//s_eDevice.currentState = PREP_TO_SLEEP_STATE;
-						//TODO: Hanlde error
-					}
-				}
-				break;
-
-				case ZPS_EVENT_APS_DATA_INDICATION:
-				{
-					DBG_vPrintf(TRACE_APP, "  NWK: ZPS_EVENT_APS_DATA_INDICATION\n");
-
-					/* Process incoming cluster messages for this endpoint... */
-					DBG_vPrintf(TRACE_APP, "  Data Indication:\r\n");
-					DBG_vPrintf(TRACE_APP, "    Status  :%d\r\n",sStackEvent.uEvent.sApsDataIndEvent.eStatus);
-					DBG_vPrintf(TRACE_APP, "    Profile :%x\r\n",sStackEvent.uEvent.sApsDataIndEvent.u16ProfileId);
-					DBG_vPrintf(TRACE_APP, "    Cluster :%x\r\n",sStackEvent.uEvent.sApsDataIndEvent.u16ClusterId);
-					DBG_vPrintf(TRACE_APP, "    EndPoint:%x\r\n",sStackEvent.uEvent.sApsDataIndEvent.u8DstEndpoint);
-					DBG_vPrintf(TRACE_APP, "    LQI     :%d\r\n",sStackEvent.uEvent.sApsDataIndEvent.u8LinkQuality);
-
-					uint8 status = vHandleIncomingFrame(sStackEvent);
-
-					if (status != FRAME_SUCCESS)
-					{
-						DBG_vPrintf(TRACE_APP, "  APP: Frame processing error, status = %d\n\r", status);
-						s_eDevice.currentState = PREP_TO_SLEEP_STATE;
-						//TODO: Handle Frame ERROR
-					}
-					else
-					{
-						/* everything OK, now we wait for ZPS_EVENT_APS_DATA_CONFIRM */
-						DBG_vPrintf(TRACE_APP, "\n\rAPP: WAIT_CONFIRM_STATE\n\r");
-						s_eDevice.currentState = WAIT_CONFIRM_STATE;
-					}
-				}
-				break;
-
-				default:
-				{
-					DBG_vPrintf
-					(
-						TRACE_APP,
-						"  NWK: Poll request unhandled event - %d\n\r",
-						sStackEvent.eType
-					);
-					//s_eDevice.currentState = PREP_TO_SLEEP_STATE;
-					//TODO: Handle error
-				}
-				break;
-			}
-        }
-        break;
-
-        case WAIT_CONFIRM_STATE:
-        {
-        	/* Check if there is any event on the stack */
-			if (ZQ_bQueueReceive(&APP_msgStrainGaugeEvents, &sStackEvent))
-			{
-				DBG_vPrintf
-				(
-					TRACE_APP,
-					"  NWK: New event on the stack APP_msgStrainGaugeEvents = %d\n\r",
-					sStackEvent.eType
-				);
-			}
-
-			switch (sStackEvent.eType)
-			{
-				case ZPS_EVENT_NONE: break;
-
-				case ZPS_EVENT_APS_DATA_CONFIRM:
-				{
-					/* Acknowledge data was sent */
-					DBG_vPrintf
-					(
-						TRACE_APP,
-						"  NWK: event ZPS_EVENT_APS_DATA_CONFIRM, status = %d, Address = 0x%04x\n",
-						sStackEvent.uEvent.sApsDataConfirmEvent.u8Status,
-						sStackEvent.uEvent.sApsDataConfirmEvent.uDstAddr.u16Addr
-					);
-
-					s_eDevice.currentState = PREP_TO_SLEEP_STATE;
-				}
-				break;
-
-				default:
-				{
-					DBG_vPrintf(TRACE_APP, "  NWK: unhandled event %d\n", sStackEvent.eType);
-					//s_eDevice.currentState = PREP_TO_SLEEP_STATE;
-					//TODO: Handle Error
-				}
-				break;
-			}
-        }
-        break;
-
-        case SEND_DATA_STATE:
-        {
-        	uint16 byteCount;
-        	PDUM_teStatus status;
-
-        	/* Enable peripherals for sensing */
-        	DISABLE_POWERSAVE();
-			ENABLE_WB();
-			ad8231_init();
-			ad8231_enable();
-			ad8231_setGain(s_eDevice.gainValue);
-			ltc1661_init();
-			ltc1661_setDAC_A(s_eDevice.channelAValue);
-			ltc1661_setDAC_B(s_eDevice.channelBValue);
-
-			/* Start ADC Conversion */
-			MCP3204_init(0);
-
-			s_eDevice.sensorValue = getMedianAvg(2, 10);
-			s_eDevice.temperatureValue = getMedianAvg(1, 10);
-			s_eDevice.batteryLevel = getMedianAvg(0, 10);
-
-			/* Low power Config */
-			ad8231_disable();
-			ltc1661_sleep();
-			DISABLE_WB();
-			ENABLE_POWERSAVE();
-
-			DBG_vPrintf(TRACE_APP, "  APP: sensorValue = %d\n\r", s_eDevice.sensorValue);
-			DBG_vPrintf(TRACE_APP, "  APP: temperatureValue = %d\n\r", s_eDevice.temperatureValue);
-			DBG_vPrintf(TRACE_APP, "  APP: batteryValue = %d\n\r", s_eDevice.batteryLevel);
-
-			DBG_vPrintf(TRACE_APP, "  APP: Sending data to Coordinator\n\r");
-			/* Allocate memory for APDU buffer with preconfigured "type" */
-			PDUM_thAPduInstance data = PDUM_hAPduAllocateAPduInstance(apduMyData);
-			if(data == PDUM_INVALID_HANDLE)
-			{
-				/* Problem allocating APDU instance memory */
-				DBG_vPrintf(TRACE_APP, "  APP: Unable to allocate APDU memory\n\r");
-				//TODO: Handle error
-			}
-			else
-			{
-				/* Load payload data into APDU */
-				byteCount = PDUM_u16APduInstanceWriteNBO
-				(
-					data,	// APDU instance handle
-					0,		// APDU position for data
-					"bhhh",	// data format string
-					'*',
-					s_eDevice.sensorValue,
-					s_eDevice.temperatureValue,
-					s_eDevice.batteryLevel
-				);
-
-				if( byteCount == 0 )
-				{
-					/* No data was written to the APDU instance */
-					DBG_vPrintf(TRACE_APP, "  APP: No data written to APDU\n\r");
-					//TODO: Handle error
-				}
-				else
-				{
-					PDUM_eAPduInstanceSetPayloadSize(data, byteCount);
-					DBG_vPrintf(TRACE_APP, "  APP: Data written to APDU: %d\n\r", byteCount);
-
-					/* Request data send to destination */
-					status = ZPS_eAplAfUnicastDataReq
-					(
-						data,					// APDU instance handle
-						0xFFFF,					// cluster ID
-						1,						// source endpoint
-						1,						// destination endpoint
-						0x0000,					// destination network address
-						ZPS_E_APL_AF_UNSECURE,	// security mode
-						0,						// radius
-						NULL					// sequence number pointer
-					);
-
-					if( status != ZPS_E_SUCCESS )
-					{
-						/* Problem with request */
-						DBG_vPrintf(TRACE_APP, "  APP: AckDataReq not successful, status = %d\n\r", status);
-						//TODO: Add strike count and handle error
-					}
-
-					/* everything OK, now we wait for ZPS_EVENT_APS_DATA_CONFIRM */
-					DBG_vPrintf(TRACE_APP, "\n\rAPP: WAIT_CONFIRM_STATE\n\r");
-					s_eDevice.currentState = WAIT_CONFIRM_STATE;
-					break;
-				}
-			}
-        }
-        break;
-
-        case PREP_TO_SLEEP_STATE:
-        {
-        	DBG_vPrintf(TRACE_APP, "\n\rAPP: PREP_TO_SLEEP_STATE\n\r");
-
-			if(s_eDevice.isConfigured && s_network.isConnected && s_network.isAuthenticated)
-				s_eDevice.sleepTime = s_eDevice.samplePeriod;
-			else s_eDevice.sleepTime = DEFAULT_SLEEP_TIME;
-
-			DBG_vPrintf
-			(
-				TRACE_APP,
-				"APP: ZTIMER_eStop: %d\n\r",
-				ZTIMER_eStop(u8TimerWatchdog)
-			);
-
-        	DBG_vPrintf
-			(
-				TRACE_APP,
-				"APP: Sleep for %d seconds\n\r",
-				s_eDevice.sleepTime
-			);
-
-        	/* Set wakeup time */
-        	PWRM_eScheduleActivity
-			(
-				&sWake,
-				SECS_TO_TICKS(s_eDevice.sleepTime),
-				vWakeCallBack
-			);
-
-        	s_eDevice.currentState = SLEEP_STATE;
-        }
-        break;
-
-        case SLEEP_STATE:
-		{
-			/* Waits until OS sends the device to sleep */
-		}
-		break;
-
-        case WAKE_UP_STATE:
-		{
-			ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
-
-			if(s_network.isConnected && s_network.isAuthenticated)
-			{
-				/* Poll data from Stack */
-				ZPS_eAplZdoPoll();
-
-				DBG_vPrintf(TRACE_APP, "\n\rAPP: POLL_DATA_STATE\n\r");
-				s_eDevice.currentState = POLL_DATA_STATE;
-			}
-			else if(s_network.isConnected && !s_network.isAuthenticated)
-			{
-				/* Poll data from Stack */
-				ZPS_eAplZdoPoll();
-
-				DBG_vPrintf(TRACE_APP, "\n\rAPP: NETWORK_STATE\n\r");
-				s_eDevice.currentState = NETWORK_STATE;
-
-				DBG_vPrintf(TRACE_APP, "  NWK: NWK_STARTUP_STATE\n\r");
-				s_network.currentState = NWK_AUTH_STATE;
-			}
-			else
-			{
-				DBG_vPrintf(TRACE_APP, "\n\rAPP: NETWORK_STATE\n\r");
-				s_eDevice.currentState = NETWORK_STATE;
-
-				DBG_vPrintf(TRACE_APP, "  NWK: NWK_STARTUP_STATE\n\r");
-				s_network.currentState = NWK_STARTUP_STATE;
-			}
-		}
-		break;
-
-        default:
-        {
-        	//TODO: Handle error
-            DBG_vPrintf
-            (
-            	TRACE_APP,
-            	"APP: Unhandled State : %d\n\r",
-            	s_eDevice.currentState
-            );
-        }
-        break;
-    }
-}
 
 /****************************************************************************/
 /***        Local Functions                                               ***/

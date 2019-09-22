@@ -1,56 +1,18 @@
-/*****************************************************************************
+/**
+ * @file nd005_api.h
+ * @brief
  *
- * MODULE:				JN-AN-1184 ZigBeePro Application Template
+ * @author Wisely SpA
+ * @date 22-Sep-19
  *
- * COMPONENT:			app_sleeping_enddevice.h
- *
- * DESCRIPTION:			Sleeping EndDevice Application
- *
- *****************************************************************************
- *
- * This software is owned by NXP B.V. and/or its supplier and is protected
- * under applicable copyright laws. All rights are reserved. We grant You,
- * and any third parties, a license to use this software solely and
- * exclusively on NXP products [NXP Microcontrollers such as JN5169, JN5168,
- * JN5164, JN5161].
- * You, and any third parties must reproduce the copyright and warranty notice
- * and any other legend of ownership on each copy or partial copy of the
- * software.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- *
- * Copyright NXP B.V. 2015. All rights reserved
- *
- ****************************************************************************/
+ */
 
-#ifndef APP_SLEEPING_ENDDEVICE_H_
-#define APP_SLEEPING_ENDDEVICE_H_
+#ifndef ND005_API_H
+#define ND005_API_H
 
 /****************************************************************************/
 /***        Macro Definitions                                             ***/
 /****************************************************************************/
-
-/*
- * DEVICE_TYPES
- * 0 = NONE
- * 1 = QB1C
- * 2 = HB2C/QB2C
- */
-#define DEVICE_TYPE		1
-
-#define VERSION_MAJOR	2
-#define VERSION_MINOR	2
-
 
 #define CHANNEL_A_DEFAULT_VALUE		2048	// DAC's channel A
 #define CHANNEL_B_DEFAULT_VALUE		2048	// DAC's channel B
@@ -61,28 +23,6 @@
 /****************************************************************************/
 /***        Type Definitions                                              ***/
 /****************************************************************************/
-
-typedef enum
-{
-	NWK_STARTUP_STATE,
-    NWK_DISC_STATE,
-    NWK_JOIN_STATE,
-    NWK_AUTH_STATE,
-    NWK_REJOIN_STATE
-} networkStates_t;
-
-typedef enum
-{
-    NETWORK_STATE,
-    WAIT_POLL_STATE,
-    POLL_DATA_STATE,
-    HANDLE_DATA_STATE,
-    WAIT_CONFIRM_STATE,
-    SEND_DATA_STATE,
-    PREP_TO_SLEEP_STATE,
-    SLEEP_STATE,
-    WAKE_UP_STATE
-} sleepingEndDeviceStates_t;
 
 typedef enum
 {
@@ -121,8 +61,12 @@ enum {
 /***        Exported Functions                                            ***/
 /****************************************************************************/
 
-PUBLIC void APP_vInitialiseSleepingEndDevice(void);
-PUBLIC void APP_vtaskSleepingEndDevice(void);
+/** @brief Initializes the Zigbee network API library
+ *
+ *  @param Void.
+ *  @return Void.
+ */
+PUBLIC void nd005_init(void);
 
 /****************************************************************************/
 /***        External Variables                                            ***/
@@ -132,4 +76,4 @@ PUBLIC void APP_vtaskSleepingEndDevice(void);
 /***        END OF FILE                                                   ***/
 /****************************************************************************/
 
-#endif /*APP_SLEEPING_ENDDEVICE_H_*/
+#endif /*ND005_API_H*/

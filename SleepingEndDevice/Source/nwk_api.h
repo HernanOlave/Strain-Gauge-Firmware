@@ -19,6 +19,18 @@
 /****************************************************************************/
 
 /****************************************************************************/
+/***        Type Definitions                                              ***/
+/****************************************************************************/
+
+typedef enum
+{
+    NWK_NO_EVENT,
+    NWK_NEW_MESSAGE,
+    NWK_NO_MESSAGE,
+    NWK_UNK_ERROR
+} pollReturnValues_t;
+
+/****************************************************************************/
 /***        Local Variables                                               ***/
 /****************************************************************************/
 
@@ -39,7 +51,7 @@
  *  @param Void.
  *  @return Void.
  */
-PUBLIC void nwk_api_init(void);
+PUBLIC void nwk_init(void);
 
 /** @brief Handles the events and state machine of the the Zigbee network
  *         API library. It must be called in the main loop.
@@ -47,4 +59,46 @@ PUBLIC void nwk_api_init(void);
  *  @param Void.
  *  @return Void.
  */
-PUBLIC void nwk_api_taskHandler(void);
+PUBLIC void nwk_taskHandler(void);
+
+/** @brief
+ *
+ *  @param
+ *  @return
+ */
+PUBLIC void nwk_discovery(void);
+
+/** @brief
+ *
+ *  @param
+ *  @return
+ */
+PUBLIC void nwk_setEpid(uint64 epid);
+
+/** @brief
+ *
+ *  @param
+ *  @return
+ */
+PUBLIC uint64 nwk_getEpid(void);
+
+/** @brief
+ *
+ *  @param
+ *  @return
+ */
+PUBLIC pollReturnValues_t nwk_getPollStatus(void);
+
+/** @brief
+ *
+ *  @param
+ *  @return
+ */
+PUBLIC void nwk_sendData(uint16 * data_ptr, uint16 size);
+
+
+/****************************************************************************/
+/***        END OF FILE                                                   ***/
+/****************************************************************************/
+
+#endif /*NWK_API_H_*/

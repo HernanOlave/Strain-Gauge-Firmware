@@ -48,54 +48,24 @@
     #include "App_SED.h"
 #endif
 
-#include "ZQueue.h"
+
 #include "ZTimer.h"
 /****************************************************************************/
 /***        Macro Definitions                                             ***/
 /****************************************************************************/
 
-#define AUTH_CODE   0xE241171A
-
 /****************************************************************************/
 /***        Type Definitions                                              ***/
 /****************************************************************************/
-typedef enum
-{
-    E_STARTUP,
-    E_LEAVE_WAIT,
-    E_LEAVE_RESET,
-    E_NFN_START,
-    E_DISCOVERY,
-    E_NETWORK_FORMATION,
-    E_JOINING_NETWORK,
-    E_REJOINING,
-    E_NETWORK_INIT,
-    E_RESCAN,
-    E_RUNNING,
-    E_AUTH_REQ
-} teNODE_STATES;
-
-typedef struct
-{
-    teNODE_STATES   eNodeState;
-    teNODE_STATES   eNodePrevState;
-}tsDeviceDesc;
 
 /****************************************************************************/
 /***        Exported Functions                                            ***/
 /****************************************************************************/
-void APP_vtaskMyEndPoint ( void );
+
 /****************************************************************************/
 /***        External Variables                                            ***/
 /****************************************************************************/
-extern tszQueue zps_msgMlmeDcfmInd;
-extern tszQueue zps_msgMcpsDcfm;
-extern tszQueue zps_msgMcpsDcfmInd;
-extern tszQueue zps_TimeEvents;
-extern tszQueue APP_msgStrainGaugeEvents;
-extern tszQueue APP_msgZpsEvents;
-extern uint8 u8App_tmr1sec;
-extern void *_stack_low_water_mark;
+
 /****************************************************************************/
 /***        END OF FILE                                                   ***/
 /****************************************************************************/

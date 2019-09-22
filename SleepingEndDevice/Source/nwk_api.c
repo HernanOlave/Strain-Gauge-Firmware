@@ -34,7 +34,6 @@
 
 typedef struct
 {
-	networkStates_t		currentState;
 	uint64				currentEpid;
 	bool				isConnected;
 	bool				isAuthenticated;
@@ -42,6 +41,7 @@ typedef struct
 	uint8				noNwkStrikes;
 	uint8				rejoinStrikes;
 	uint8				authStrikes;
+	pollReturnValues_t	pollStatus;
 } networkDesc_t;
 
 /****************************************************************************/
@@ -161,6 +161,7 @@ PRIVATE void networkPoll_handler(ZPS_tsAfEvent sStackEvent)
 	if(eStatus == MAC_ENUM_NO_DATA)
 	{
 		DBG_vPrintf(TRACE_APP,"  NWK: No new Data\n\r");
+		s_network.pollStatus = NWK_NO_MESSAGE;
 	}
 
 	/* Success */
@@ -271,10 +272,8 @@ PRIVATE void blacklistNetwork(void)
 /***        Exported Functions                                            ***/
 /****************************************************************************/
 
-PUBLIC void nwk_api_init(void)
+PUBLIC void nwk_init(void)
 {
-	ZPS_teStatus eStatus;
-
 	DBG_vPrintf(TRACE_APP, "  NWK: Initializing network API\n\r");
 
 	s_network.isAuthenticated = FALSE;
@@ -285,69 +284,15 @@ PUBLIC void nwk_api_init(void)
 	s_network.rejoinStrikes = 0;
 	s_network.authStrikes = 0;
 
-	/* If network parameters were restored, Rejoin */
-	if(s_network.currentEpid)
-	{
-		DBG_vPrintf(TRACE_APP,"  NWK: Trying to rejoin network 0x%016llx\n\r", s_network.currentEpid);
+	s_network.pollStatus = NWK_NO_EVENT;
 
-		ZPS_eAplAibSetApsUseExtendedPanId(s_network.currentEpid);
+	/* Initialize ZBPro stack */
+	ZPS_eAplAfInit();
 
-		/* Rejoin stored network without a discovery process */
-		eStatus = ZPS_eAplZdoRejoinNetwork(FALSE);
-
-		if (eStatus != ZPS_E_SUCCESS)
-		{
-			DBG_vPrintf
-			(TRACE_APP, "  NWK: Failed rejoin request, status = %02X\n\r", eStatus);
-			//TODO: Handle errors
-		}
-		else
-		{
-			//TODO: Review this
-			s_network.isAuthenticated = TRUE;
-		}
-	}
-	else /* Discovery */
-	{
-		/* Create Beacon filter */
-		discoverFilter.pu64ExtendPanIdList = blacklistEpids;
-		discoverFilter.u8ListSize = blacklistIndex;
-		discoverFilter.u16FilterMap = (BF_BITMAP_BLACKLIST);
-
-		ZPS_bAppAddBeaconFilter(&discoverFilter);
-
-		/* Reset nwk params */
-		void * pvNwk = ZPS_pvAplZdoGetNwkHandle();
-		ZPS_vNwkNibSetExtPanId(pvNwk, 0);
-		ZPS_eAplAibSetApsUseExtendedPanId(0);
-
-		/* Set security keys */
-		ZPS_vAplSecSetInitialSecurityState
-		(
-			ZPS_ZDO_PRECONFIGURED_LINK_KEY,
-			au8DefaultTCLinkKey,
-			0x00,
-			ZPS_APS_GLOBAL_LINK_KEY
-		);
-
-		/* Start the network stack as a end device */
-		DBG_vPrintf(TRACE_APP, "  NWK: Starting ZPS\n\r");
-		eStatus = ZPS_eAplZdoStartStack();
-
-		if (ZPS_E_SUCCESS != eStatus)
-		{
-			DBG_vPrintf
-			(
-				TRACE_APP,
-				"  NWK: Failed to Start Stack, status = %02X\n\r",
-				eStatus
-			);
-			//TODO: Handle error
-		}
-	}
+	nwk_api_discovery();
 }
 
-PUBLIC void nwk_api_taskHandler(void)
+PUBLIC void nwk_taskHandler(void)
 {
 	ZPS_tsAfEvent sStackEvent;
 	sStackEvent.eType = ZPS_EVENT_NONE;
@@ -381,6 +326,7 @@ PUBLIC void nwk_api_taskHandler(void)
 		case ZPS_EVENT_APS_DATA_INDICATION:
 		{
 			DBG_vPrintf(TRACE_APP, "  NWK: ZPS_EVENT_APS_DATA_INDICATION\n\r");
+			s_network.pollStatus = NWK_NEW_MESSAGE;
 			networkData_handler(sStackEvent);
 		}
 		break;
@@ -450,6 +396,152 @@ PUBLIC void nwk_api_taskHandler(void)
 	}
 }
 
+PUBLIC void nwk_discovery(void)
+{
+	ZPS_teStatus eStatus;
+
+	/* If network parameters were restored, Rejoin */
+	if(s_network.currentEpid)
+	{
+		DBG_vPrintf(TRACE_APP,"  NWK: Trying to rejoin network 0x%016llx\n\r", s_network.currentEpid);
+
+		ZPS_eAplAibSetApsUseExtendedPanId(s_network.currentEpid);
+
+		/* Rejoin stored network without a discovery process */
+		eStatus = ZPS_eAplZdoRejoinNetwork(FALSE);
+
+		if (eStatus != ZPS_E_SUCCESS)
+		{
+			DBG_vPrintf
+			(TRACE_APP, "  NWK: Failed rejoin request, status = %02X\n\r", eStatus);
+			//TODO: Handle errors
+		}
+		else
+		{
+			//TODO: Review this
+			s_network.isAuthenticated = TRUE;
+		}
+	}
+	else /* Discovery */
+	{
+		/* Create Beacon filter */
+		discoverFilter.pu64ExtendPanIdList = blacklistEpids;
+		discoverFilter.u8ListSize = blacklistIndex;
+		discoverFilter.u16FilterMap = (BF_BITMAP_BLACKLIST);
+
+		ZPS_bAppAddBeaconFilter(&discoverFilter);
+
+		/* Reset nwk params */
+		void * pvNwk = ZPS_pvAplZdoGetNwkHandle();
+		ZPS_vNwkNibSetExtPanId(pvNwk, 0);
+		ZPS_eAplAibSetApsUseExtendedPanId(0);
+
+		/* Set security keys */
+		ZPS_vAplSecSetInitialSecurityState
+		(
+			ZPS_ZDO_PRECONFIGURED_LINK_KEY,
+			au8DefaultTCLinkKey,
+			0x00,
+			ZPS_APS_GLOBAL_LINK_KEY
+		);
+
+		/* Start the network stack as a end device */
+		DBG_vPrintf(TRACE_APP, "  NWK: Starting ZPS\n\r");
+		eStatus = ZPS_eAplZdoStartStack();
+
+		if (ZPS_E_SUCCESS != eStatus)
+		{
+			DBG_vPrintf
+			(
+				TRACE_APP,
+				"  NWK: Failed to Start Stack, status = %02X\n\r",
+				eStatus
+			);
+			//TODO: Handle error
+		}
+	}
+}
+
+PUBLIC void nwk_setEpid(uint64 epid)
+{
+	s_network.currentEpid = epid;
+}
+
+PUBLIC uint64 nwk_getEpid(void)
+{
+	return s_network.currentEpid;
+}
+
+PUBLIC pollReturnValues_t nwk_getPollStatus(void)
+{
+	uint8 temp = s_network.pollStatus;
+	s_network.pollStatus = NWK_NO_EVENT;
+	return temp;
+}
+
+PUBLIC void nwk_sendData(uint16 * data_ptr, uint16 size)
+{
+	DBG_vPrintf(TRACE_APP, "  APP: Sending data to Coordinator\n\r");
+
+	/* Allocate memory for APDU buffer with preconfigured "type" */
+	PDUM_thAPduInstance data = PDUM_hAPduAllocateAPduInstance(apduMyData);
+	if(data == PDUM_INVALID_HANDLE)
+	{
+		/* Problem allocating APDU instance memory */
+		DBG_vPrintf(TRACE_APP, "  APP: Unable to allocate APDU memory\n\r");
+		//TODO: Handle error
+	}
+	else
+	{
+		uint16 byteCount, index;
+		PDUM_teStatus eStatus;
+
+		for(index = 0; index < size; index++)
+		{
+			/* Load payload data into APDU */
+			byteCount = PDUM_u16APduInstanceWriteNBO
+			(
+				data,	// APDU instance handle
+				index,	// APDU position for data
+				"h",	// data format string
+				data_ptr[index]
+			);
+		}
+
+		if( byteCount == 0 )
+		{
+			/* No data was written to the APDU instance */
+			DBG_vPrintf(TRACE_APP, "  APP: No data written to APDU\n\r");
+			//TODO: Handle error
+		}
+		else
+		{
+			PDUM_eAPduInstanceSetPayloadSize(data, byteCount);
+			DBG_vPrintf(TRACE_APP, "  APP: Data written to APDU: %d\n\r", byteCount);
+
+			/* Request data send to destination */
+			eStatus = ZPS_eAplAfUnicastDataReq
+			(
+				data,					// APDU instance handle
+				0xFFFF,					// cluster ID
+				1,						// source endpoint
+				1,						// destination endpoint
+				0x0000,					// destination network address
+				ZPS_E_APL_AF_UNSECURE,	// security mode
+				0,						// radius
+				NULL					// sequence number pointer
+			);
+
+			if(eStatus != ZPS_E_SUCCESS)
+			{
+				/* Problem with request */
+				DBG_vPrintf(TRACE_APP, "  APP: AckDataReq not successful, status = %d\n\r", status);
+				//TODO: Add strike count and handle error
+			}
+		}
+	}
+}
+
 PUBLIC void APP_vGenCallback(uint8 u8Endpoint, ZPS_tsAfEvent *psStackEvent)
 {
     if ( u8Endpoint == 0 )
@@ -463,5 +555,5 @@ PUBLIC void APP_vGenCallback(uint8 u8Endpoint, ZPS_tsAfEvent *psStackEvent)
 }
 
 /****************************************************************************/
-/***        End of File		                                              ***/
+/***        END OF FILE                                                   ***/
 /****************************************************************************/

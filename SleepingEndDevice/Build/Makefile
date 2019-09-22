@@ -147,8 +147,8 @@ endif
 APPSRC += pdum_gen.c
 APPSRC += pdum_apdu.S
 APPSRC += zps_gen.c
-APPSRC += app_start_SED.c
-APPSRC += app_sleeping_enddevice.c
+APPSRC += app_main.c
+APPSRC += nd005_api.c
 APPSRC += app_syscon.c
 APPSRC += appZdpExtraction.c
 APPSRC += appZpsBeaconHandler.c
