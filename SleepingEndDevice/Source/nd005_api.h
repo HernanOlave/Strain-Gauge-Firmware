@@ -44,8 +44,6 @@ typedef struct
 	uint16						temperatureValue;
 	uint16						batteryLevel;
 	uint16						sleepTime;
-	sleepingEndDeviceStates_t   currentState;
-	sleepingEndDeviceStates_t   previousState;
 } seDeviceDesc_t;
 
 enum {

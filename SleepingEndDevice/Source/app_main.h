@@ -16,6 +16,7 @@
 
 #include <jendefs.h>
 #include <app_pdm.h>
+#include <dbg.h>
 
 #include "ZTimer.h"
 #include "ZQueue.h"
