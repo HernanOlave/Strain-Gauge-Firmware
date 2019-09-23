@@ -262,6 +262,15 @@ PRIVATE void app_vMainloop(void)
 			{
 				ZTIMER_eStop(u8TimerWatchdog);
 
+				nd005_lowPower(TRUE);
+
+				DBG_vPrintf
+				(
+					TRACE_APP,
+					"APP: PWRM_u16GetActivityCount = %d\n\r",
+					PWRM_u16GetActivityCount()
+				);
+
 				DBG_vPrintf
 				(
 					TRACE_APP,
@@ -270,14 +279,12 @@ PRIVATE void app_vMainloop(void)
 				);
 
 				/* Set wakeup time */
-				uint8 status = PWRM_eScheduleActivity
+				PWRM_eScheduleActivity
 				(
 					&sWake,
 					SECS_TO_TICKS(5),
 					vWakeCallBack
 				);
-
-				DBG_vPrintf(TRACE_APP, "APP: PWRM_eScheduleActivity = 0x%02x\n\r", status);
 
 				app_currentState = SLEEP_STATE;
 			}
@@ -292,6 +299,9 @@ PRIVATE void app_vMainloop(void)
 			case WAKE_UP_STATE:
 			{
 				ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
+
+				nd005_init();
+				nd005_lowPower(FALSE);
 
 				/* Poll data from Stack */
 				ZPS_eAplZdoPoll();
