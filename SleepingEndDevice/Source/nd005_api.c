@@ -13,6 +13,7 @@
 
 #include <jendefs.h>
 
+#include "nd005_api.h"
 #include "mcp3204.h"
 #include "ad8231.h"
 #include "ltc1661.h"
@@ -46,6 +47,27 @@
 /****************************************************************************/
 /***        Exported Functions                                            ***/
 /****************************************************************************/
+
+PUBLIC void nd005_init(void)
+{
+	vAHI_DioSetDirection((1 << CONFIG_BUTTON_PIN), 0x0);
+	vAHI_DioSetDirection(0x0,(1 << LN_PIN));
+	vAHI_DioSetDirection(0x0,(1 << POWERSAVE_PIN));
+	vAHI_DioSetDirection(0x0,(1 << WB_ENABLE_PIN));
+
+}
+
+PUBLIC void nd005_lowPower(uint8 enable)
+{
+	if (enable)
+	{
+
+	}
+	else
+	{
+
+	}
+}
 
 /****************************************************************************/
 /***        Local Functions                                               ***/

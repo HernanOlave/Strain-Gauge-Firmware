@@ -20,6 +20,11 @@
 #define DEFAULT_SLEEP_TIME			5		// seconds TODO: change this in production
 #define DEFAULT_SAMPLE_PERIOD		10		// seconds
 
+#define CONFIG_BUTTON_PIN			13
+#define LN_PIN						17
+#define POWERSAVE_PIN				12
+#define WB_ENABLE_PIN				11
+
 /****************************************************************************/
 /***        Type Definitions                                              ***/
 /****************************************************************************/
@@ -59,12 +64,19 @@ enum {
 /***        Exported Functions                                            ***/
 /****************************************************************************/
 
-/** @brief Initializes the Zigbee network API library
+/** @brief
  *
- *  @param Void.
- *  @return Void.
+ *  @param
+ *  @return
  */
 PUBLIC void nd005_init(void);
+
+/** @brief
+ *
+ *  @param
+ *  @return
+ */
+PUBLIC void nd005_lowPower(uint8 enable);
 
 /****************************************************************************/
 /***        External Variables                                            ***/

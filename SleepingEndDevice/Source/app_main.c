@@ -12,6 +12,7 @@
 /****************************************************************************/
 
 #include "app_main.h"
+#include "nd005_api.h"
 
 /****************************************************************************/
 /***        Macro Definitions                                             ***/
@@ -36,6 +37,9 @@ PRIVATE void vfExtendedStatusCallBack (ZPS_teExtendedStatus eExtendedStatus);
 /***        Local Variables                                               ***/
 /****************************************************************************/
 
+PRIVATE PWRM_DECLARE_CALLBACK_DESCRIPTOR(Wakeup);
+PRIVATE PWRM_DECLARE_CALLBACK_DESCRIPTOR(PreSleep);
+
 /****************************************************************************/
 /***        Exported Variables                                            ***/
 /****************************************************************************/
@@ -46,7 +50,15 @@ PRIVATE void vfExtendedStatusCallBack (ZPS_teExtendedStatus eExtendedStatus);
 
 PUBLIC void vAppMain(void)
 {
-	APP_vSetUpHardware();
+	/* Wait until FALSE i.e. on XTAL  - otherwise uart data will be at wrong speed */
+    while (bAHI_GetClkSource() == TRUE);
+    /* Now we are running on the XTAL, optimise the flash memory wait states. */
+    vAHI_OptimiseWaitStates();
+
+    /* Initialise the debug diagnostics module to use UART0 at 115K Baud;
+     * Do not use UART 1 if LEDs are used, as it shares DIO with the LEDS
+     */
+    DBG_vUartInit(DBG_E_UART_0, DBG_E_UART_BAUD_RATE_115200);
 
     DBG_vPrintf(TRACE_APP, "\n\nAPP: Power Up\n");
     DBG_vPrintf(TRACE_APP, "Device Type: %d\n", DEVICE_TYPE);
@@ -71,6 +83,7 @@ PUBLIC void vAppMain(void)
 
     /* Create Z timers */
     ZTIMER_eOpen(&u8TimerWatchdog, APP_cbTimerWatchdog,  NULL, ZTIMER_FLAG_PREVENT_SLEEP);
+    ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
 
     /* Create Queues */
     ZQ_vQueueCreate(&zps_msgMlmeDcfmInd,         MLME_QUEQUE_SIZE,      sizeof(MAC_tsMlmeVsDcfmInd), (uint8*)asMacMlmeVsDcfmInd);
@@ -104,8 +117,17 @@ PUBLIC void vAppMain(void)
     /* Register callback that provides information about stack errors */
     ZPS_vExtendedStatusSetCallback(vfExtendedStatusCallBack);
 
+	APP_vSetUpHardware();
+
     /* Initialize application API */
     nd005_init();
+
+    /* Initialize network API */
+    nwk_init();
+
+    /* On startup, first state is POLL_DATA */
+    DBG_vPrintf(TRACE_APP, "\n\rAPP: POLL_DATA_STATE\n\r");
+    app_currentState = POLL_DATA_STATE;
 
     /* Enter main loop */
     app_vMainloop();
@@ -123,20 +145,10 @@ void vAppRegisterPWRMCallbacks(void)
 
 PRIVATE void APP_vSetUpHardware(void)
 {
-	/* Wait until FALSE i.e. on XTAL, otherwise uart data will be at wrong speed */
-	while (bAHI_GetClkSource() == TRUE);
-	/* Now we are running on the XTAL, optimise the flash memory wait states. */
-	vAHI_OptimiseWaitStates();
-
-	/* Initialise the debug diagnostics module to use UART0 at 115K Baud */
-	DBG_vUartInit(DBG_E_UART_0, DBG_E_UART_BAUD_RATE_115200);
-
-	vAppApiSetHighPowerMode(APP_API_MODULE_HPM06, TRUE);
-
-	TARGET_INITIALISE();
-	/* clear interrupt priority level  */
-	SET_IPL(0);
-	portENABLE_INTERRUPTS();
+    TARGET_INITIALISE();
+    /* clear interrupt priority level  */
+    SET_IPL(0);
+    portENABLE_INTERRUPTS();
 }
 
 PRIVATE PWRM_CALLBACK(PreSleep)
@@ -147,8 +159,21 @@ PRIVATE PWRM_CALLBACK(PreSleep)
 
 PRIVATE PWRM_CALLBACK(Wakeup)
 {
-	APP_vSetUpHardware();
+	/* Wait until FALSE i.e. on XTAL  - otherwise uart data will be at wrong speed */
+    while (bAHI_GetClkSource() == TRUE);
+    /* Now we are running on the XTAL, optimise the flash memory wait states. */
+    vAHI_OptimiseWaitStates();
+
+    /* Initialise the debug diagnostics module to use UART0 at 115K Baud;
+     * Do not use UART 1 if LEDs are used, as it shares DIO with the LEDS
+     */
+    DBG_vUartInit(DBG_E_UART_0, DBG_E_UART_BAUD_RATE_115200);
+
+    /* Restore Mac settings (turns radio on) */
     vMAC_RestoreSettings();
+
+    APP_vSetUpHardware();
+
     ZTIMER_vWake();
 }
 
@@ -157,6 +182,12 @@ PRIVATE void vWakeCallBack(void)
 	DBG_vPrintf(TRACE_APP, "\n\r\n\r*** WAKE UP ROUTINE ***\n\r");
 	DBG_vPrintf(TRACE_APP, "APP: WAKE_UP_STATE\n\r");
 	app_currentState = WAKE_UP_STATE;
+}
+
+PUBLIC void APP_cbTimerWatchdog(void *pvParam)
+{
+	DBG_vPrintf(TRACE_APP, "\n\rAPP: PREP_TO_SLEEP_STATE\n\r");
+	app_currentState = PREP_TO_SLEEP_STATE;
 }
 
 PRIVATE void vfExtendedStatusCallBack (ZPS_teExtendedStatus eExtendedStatus)
@@ -184,9 +215,10 @@ PRIVATE void app_vMainloop(void)
 		if(app_currentState != app_previousState)
 		{
 			if (app_currentState != SLEEP_STATE)
-			{
-					ZTIMER_eStop(u8TimerWatchdog);
-					ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
+{
+
+				ZTIMER_eStop(u8TimerWatchdog);
+				ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
 			}
 			app_previousState = app_currentState;
 		}
@@ -238,12 +270,14 @@ PRIVATE void app_vMainloop(void)
 				);
 
 				/* Set wakeup time */
-				PWRM_eScheduleActivity
+				uint8 status = PWRM_eScheduleActivity
 				(
 					&sWake,
 					SECS_TO_TICKS(5),
 					vWakeCallBack
 				);
+
+				DBG_vPrintf(TRACE_APP, "APP: PWRM_eScheduleActivity = 0x%02x\n\r", status);
 
 				app_currentState = SLEEP_STATE;
 			}
@@ -264,7 +298,6 @@ PRIVATE void app_vMainloop(void)
 
 				DBG_vPrintf(TRACE_APP, "\n\rAPP: POLL_DATA_STATE\n\r");
 				app_currentState = POLL_DATA_STATE;
-
 			}
 			break;
 

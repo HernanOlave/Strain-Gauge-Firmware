@@ -32,11 +32,16 @@
 #include "zps_tsv.h"
 #include "AppApi.h"
 
+#include <zps_nwk_pub.h>
+#include "portmacro.h"
+#include "mac_vs_sap.h"
+#include "AppHardwareApi.h"
+#include <AHI_ModuleConfiguration.h>
+
 #include "ZTimer.h"
 #include "ZQueue.h"
 
 #include "nwk_api.h"
-#include "nd005_api.h"
 
 /****************************************************************************/
 /***        Macro Definitions                                             ***/
@@ -87,8 +92,6 @@ typedef enum
 PRIVATE void app_vMainloop(void);
 PRIVATE void APP_vSetUpHardware(void);
 PRIVATE void vfExtendedStatusCallBack (ZPS_teExtendedStatus eExtendedStatus);
-PRIVATE PWRM_DECLARE_CALLBACK_DESCRIPTOR(Wakeup);
-PRIVATE PWRM_DECLARE_CALLBACK_DESCRIPTOR(PreSleep);
 PRIVATE MAC_tsMcpsVsCfmData asMacMcpsDcfm[MCPS_DCFM_QUEUE_SIZE];
 PRIVATE zps_tsTimeEvent asTimeEvent[TIMER_QUEUE_SIZE];
 PRIVATE MAC_tsMcpsVsDcfmInd asMacMcpsDcfmInd[MCPS_QUEUE_SIZE];

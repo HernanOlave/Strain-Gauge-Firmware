@@ -13,6 +13,7 @@
 
 #include <jendefs.h>
 #include <app_pdm.h>
+#include <appZpsBeaconHandler.h>
 
 #include "pwrm.h"
 #include "pdum_nwk.h"
@@ -28,7 +29,10 @@
 #include "zps_apl_zdo.h"
 #include "zps_tsv.h"
 #include "AppApi.h"
+#include "ZTimer.h"
+#include "ZQueue.h"
 
+#include "app_main.h"
 #include "nwk_api.h"
 
 /****************************************************************************/
@@ -67,8 +71,6 @@ typedef struct
 
 PRIVATE networkDesc_t s_network;
 PRIVATE uint8 au8DefaultTCLinkKey[16] = "ZigBeeAlliance09";
-PRIVATE tszQueue APP_msgStrainGaugeEvents;
-PRIVATE tszQueue APP_msgZpsEvents;
 PRIVATE uint64 blacklistEpids[BLACKLIST_MAX] = { 0 };
 PRIVATE uint8  blacklistIndex = 0;
 PRIVATE tsBeaconFilterType discoverFilter;
@@ -77,6 +79,9 @@ PRIVATE uint16 rxBuffer[RX_BUFFER_SIZE];
 /****************************************************************************/
 /***        Exported Variables                                            ***/
 /****************************************************************************/
+
+tszQueue APP_msgStrainGaugeEvents;
+tszQueue APP_msgZpsEvents;
 
 /****************************************************************************/
 /***        Local Function Prototypes                                     ***/
@@ -101,7 +106,7 @@ PRIVATE void networkDiscovery_handler(ZPS_tsAfEvent sStackEvent)
 		DBG_vPrintf
 		(
 			TRACE_APP,
-			"  NWK: Network discovery failed, status = %02X\n\r",
+			"  NWK: Network discovery failed, status = 0x%02x\n\r",
 			sStackEvent.uEvent.sNwkDiscoveryEvent.eStatus
 		);
 		//TODO: Hanlde error
@@ -144,7 +149,7 @@ PRIVATE void networkDiscovery_handler(ZPS_tsAfEvent sStackEvent)
 				DBG_vPrintf
 				(
 					TRACE_APP,
-					"  NWK: Join not permitted, status = %02X\n\r",
+					"  NWK: Join not permitted, status = 0x%02x\n\r",
 					eStatus
 				);
 				//TODO: Handle error
@@ -158,7 +163,7 @@ PRIVATE void networkDiscovery_handler(ZPS_tsAfEvent sStackEvent)
 				DBG_vPrintf
 				(
 					TRACE_APP,
-					"  NWK: Failed to request network join, status = %02X\n\r",
+					"  NWK: Failed to request network join, status = 0x%02x\n\r",
 					eStatus
 				);
 				//TODO: Handle ERROR
@@ -172,7 +177,7 @@ PRIVATE void networkPoll_handler(ZPS_tsAfEvent sStackEvent)
 	ZPS_teStatus eStatus;
 
 	eStatus = sStackEvent.uEvent.sNwkPollConfirmEvent.u8Status;
-	DBG_vPrintf(TRACE_APP, "  NWK: Status = %02X\n\r", eStatus);
+	DBG_vPrintf(TRACE_APP, "  NWK: Status = 0x%02x\n\r", eStatus);
 
 	/* No new data */
 	if(eStatus == MAC_ENUM_NO_DATA)
@@ -212,7 +217,7 @@ PRIVATE void networkPoll_handler(ZPS_tsAfEvent sStackEvent)
 		DBG_vPrintf
 		(
 			TRACE_APP,
-			"  NWK: Unexpected poll complete, status = %02X\n\r",
+			"  NWK: Unexpected poll complete, status = 0x%02x\n\r",
 			eStatus
 		);
 	}
@@ -281,7 +286,7 @@ PRIVATE void blacklistNetwork(void)
     );
     if( status != ZPS_E_SUCCESS )
     {
-        DBG_vPrintf(TRACE_APP, " APP: LeaveNetwork Request Failed, status = %02X\n\r", status);
+        DBG_vPrintf(TRACE_APP, " APP: LeaveNetwork Request Failed, status = 0x%02x\n\r", status);
     }
 }
 
@@ -306,7 +311,7 @@ PUBLIC void nwk_init(void)
 	/* Initialize ZBPro stack */
 	ZPS_eAplAfInit();
 
-	nwk_api_discovery();
+	nwk_discovery();
 }
 
 PUBLIC void nwk_taskHandler(void)
@@ -320,7 +325,7 @@ PUBLIC void nwk_taskHandler(void)
 		DBG_vPrintf
 		(
 			TRACE_APP,
-			"  NWK: New event on the stack APP_msgZpsEvents = %02X\n\r",
+			"  NWK: New event on the stack APP_msgZpsEvents = 0x%02x\n\r",
 			sStackEvent.eType
 		);
 	}
@@ -329,7 +334,7 @@ PUBLIC void nwk_taskHandler(void)
 		DBG_vPrintf
 		(
 			TRACE_APP,
-			"  NWK: New event on the stack APP_msgStrainGaugeEvents = %02X\n\r",
+			"  NWK: New event on the stack APP_msgStrainGaugeEvents = 0x%02x\n\r",
 			sStackEvent.eType
 		);
 	}
@@ -350,14 +355,14 @@ PUBLIC void nwk_taskHandler(void)
 
 		case ZPS_EVENT_APS_DATA_CONFIRM:
 		{
-			DBG_vPrintf(TRACE_APP, "  NWK: ZPS_EVENT_APS_DATA_CONFIRM, status = %02X\n\r",
+			DBG_vPrintf(TRACE_APP, "  NWK: ZPS_EVENT_APS_DATA_CONFIRM, status = 0x%02x\n\r",
 					sStackEvent.uEvent.sApsDataConfirmEvent.u8Status);
 		}
 		break;
 
 		case ZPS_EVENT_APS_DATA_ACK:
 		{
-			DBG_vPrintf(TRACE_APP, "  NWK: ZPS_EVENT_APS_DATA_ACK, status = %02X\n\r",
+			DBG_vPrintf(TRACE_APP, "  NWK: ZPS_EVENT_APS_DATA_ACK, status = 0x%02x\n\r",
 					sStackEvent.uEvent.sApsDataAckEvent.u8Status);
 		}
 		break;
@@ -407,7 +412,7 @@ PUBLIC void nwk_taskHandler(void)
 
 		default:
 		{
-			DBG_vPrintf(TRACE_APP, "  NWK: Unhandled event %02X\n", sStackEvent.eType);
+			DBG_vPrintf(TRACE_APP, "  NWK: Unhandled event 0x%02x\n", sStackEvent.eType);
 		}
 		break;
 	}
@@ -430,7 +435,7 @@ PUBLIC void nwk_discovery(void)
 		if (eStatus != ZPS_E_SUCCESS)
 		{
 			DBG_vPrintf
-			(TRACE_APP, "  NWK: Failed rejoin request, status = %02X\n\r", eStatus);
+			(TRACE_APP, "  NWK: Failed rejoin request, status = 0x%02x\n\r", eStatus);
 			//TODO: Handle errors
 		}
 		else
@@ -471,7 +476,7 @@ PUBLIC void nwk_discovery(void)
 			DBG_vPrintf
 			(
 				TRACE_APP,
-				"  NWK: Failed to Start Stack, status = %02X\n\r",
+				"  NWK: Failed to Start Stack, status = 0x%02x\n\r",
 				eStatus
 			);
 			//TODO: Handle error
