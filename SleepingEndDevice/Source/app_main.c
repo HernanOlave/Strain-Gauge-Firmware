@@ -30,6 +30,8 @@
 /***        Local Function Prototypes                                     ***/
 /****************************************************************************/
 
+PRIVATE void vfExtendedStatusCallBack (ZPS_teExtendedStatus eExtendedStatus);
+
 /****************************************************************************/
 /***        Local Variables                                               ***/
 /****************************************************************************/
@@ -89,8 +91,12 @@ PUBLIC void vAppMain(void)
      *  To use the key stored in eFuse set the pointer to the key to Null, and remove the
      *  key structure here.
      */
+	#ifdef PDM_EEPROM
 	PDM_eInitialise(63);
 	PDM_vRegisterSystemCallback(vPdmEventHandlerCallback);
+	#else
+	PDM_vInit(7, 1, 64 * 1024 , NULL, NULL, NULL, &g_sKey);
+	#endif
 
     /* Initialize Protocol Data Unit Manager */
     PDUM_vInit();
@@ -144,6 +150,13 @@ PRIVATE PWRM_CALLBACK(Wakeup)
 	APP_vSetUpHardware();
     vMAC_RestoreSettings();
     ZTIMER_vWake();
+}
+
+PRIVATE void vWakeCallBack(void)
+{
+	DBG_vPrintf(TRACE_APP, "\n\r\n\r*** WAKE UP ROUTINE ***\n\r");
+	DBG_vPrintf(TRACE_APP, "APP: WAKE_UP_STATE\n\r");
+	app_currentState = WAKE_UP_STATE;
 }
 
 PRIVATE void vfExtendedStatusCallBack (ZPS_teExtendedStatus eExtendedStatus)

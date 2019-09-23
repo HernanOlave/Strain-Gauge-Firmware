@@ -16,7 +16,21 @@
 
 #include <jendefs.h>
 #include <app_pdm.h>
-#include <dbg.h>
+
+#include "pwrm.h"
+#include "pdum_nwk.h"
+#include "pdum_apl.h"
+#include "pdum_gen.h"
+#include "PDM.h"
+#include "dbg.h"
+#include "dbg_uart.h"
+#include "rnd_pub.h"
+#include "zps_gen.h"
+#include "zps_apl.h"
+#include "zps_apl_af.h"
+#include "zps_apl_zdo.h"
+#include "zps_tsv.h"
+#include "AppApi.h"
 
 #include "ZTimer.h"
 #include "ZQueue.h"
@@ -47,6 +61,9 @@
 #define MCPS_DCFM_QUEUE_SIZE	8
 
 #define AUTH_CODE				0xE241171A
+
+#define SECS_TO_TICKS(seconds)	seconds * 32768
+#define STATE_MACHINE_WDG_TIME	ZTIMER_TIME_MSEC(5000)
 
 /****************************************************************************/
 /***        Type Definitions                                              ***/
@@ -81,8 +98,6 @@ PRIVATE ZPS_tsAfEvent asStackEvents[ZPS_QUEUE_SIZE];
 
 PRIVATE ZTIMER_tsTimer asTimers[4];
 
-PRIVATE bool_t wakeup = FALSE;
-
 PRIVATE sleepingEndDeviceStates_t app_currentState;
 PRIVATE sleepingEndDeviceStates_t app_previousState;
 
@@ -96,6 +111,7 @@ PRIVATE sleepingEndDeviceStates_t app_previousState;
 /****************************************************************************/
 
 PUBLIC uint8 u8TimerWatchdog;
+PUBLIC pwrm_tsWakeTimerEvent sWake;
 
 extern tszQueue zps_msgMlmeDcfmInd;
 extern tszQueue zps_msgMcpsDcfm;

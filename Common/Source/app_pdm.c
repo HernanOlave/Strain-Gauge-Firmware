@@ -35,6 +35,7 @@
 /****************************************************************************/
 /***        Include files                                                 ***/
 /****************************************************************************/
+
 #include <jendefs.h>
 #include <pdm.h>
 #include <dbg_uart.h>
@@ -44,6 +45,7 @@
 /****************************************************************************/
 /***        Macro Definitions                                             ***/
 /****************************************************************************/
+
 #ifndef DEBUG_PDM
 	#define TRACE_PDM 	FALSE
 #else
@@ -65,8 +67,8 @@
 /****************************************************************************/
 /***        Exported Variables                                            ***/
 /****************************************************************************/
+
 extern PDM_tsRecordDescriptor sDevicePDDesc;
-extern tsDeviceDesc sDeviceDesc;
 
 /****************************************************************************/
 /***        Local Variables                                               ***/
@@ -146,33 +148,6 @@ PUBLIC void vPdmEventHandlerCallback(uint32 u32EventNumber, PDM_eSystemEventCode
     }
 }
 #endif
-
-/****************************************************************************
- *
- * NAME: eRestoreDeviceState
- *
- * DESCRIPTION:
- * Retrieves device state from the PDM
- *
- * RETURNS:
- * void
- *
- ****************************************************************************/
-PUBLIC PDM_teStatus eRestoreDeviceState(void)
-{
-	 /* Restore any application data previously saved to flash */
-	uint16 u16ByteRead;
-
-    PDM_teStatus eDeviceStatus = PDM_eReadDataFromRecord(PDM_ID_APP_ROUTER,
-                                                        &sDeviceDesc,
-                                                        sizeof(tsDeviceDesc),
-                                                        &u16ByteRead);
-
-   DBG_vPrintf(TRACE_PDM, "\nAPP: PDM Load APP_ROUTER returned %d, RecState=%d", eDeviceStatus, sDevicePDDesc.eState);
-   DBG_vPrintf(TRACE_PDM, "\nAPP State %d", sDeviceDesc.eNodeState);
-
-   return (eDeviceStatus);
-}
 
 /****************************************************************************
  *

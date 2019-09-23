@@ -32,6 +32,7 @@
  * Copyright NXP B.V. 2015. All rights reserved
  *
  ****************************************************************************/
+
 #ifndef APP_PDM_H_
 #define APP_PDM_H_
 
@@ -49,10 +50,10 @@
 /****************************************************************************/
 /***        Exported Functions                                            ***/
 /****************************************************************************/
+
 #ifdef PDM_EEPROM
-    PUBLIC void vPdmEventHandlerCallback(uint32 u32EventNumber, PDM_eSystemEventCode eSystemEventCode);
-    PUBLIC void vDisplayPDMUsage(void);
-    PUBLIC PDM_teStatus eRestoreDeviceState(void);
+PUBLIC void vPdmEventHandlerCallback(uint32 u32EventNumber, PDM_eSystemEventCode eSystemEventCode);
+PUBLIC void vDisplayPDMUsage(void);
 #endif
 
 /****************************************************************************/

@@ -11,7 +11,24 @@
 /***        Libraries                                                     ***/
 /****************************************************************************/
 
+#include <jendefs.h>
+#include <app_pdm.h>
+
+#include "pwrm.h"
+#include "pdum_nwk.h"
+#include "pdum_apl.h"
+#include "pdum_gen.h"
+#include "PDM.h"
 #include "dbg.h"
+#include "dbg_uart.h"
+#include "rnd_pub.h"
+#include "zps_gen.h"
+#include "zps_apl.h"
+#include "zps_apl_af.h"
+#include "zps_apl_zdo.h"
+#include "zps_tsv.h"
+#include "AppApi.h"
+
 #include "nwk_api.h"
 
 /****************************************************************************/
@@ -535,7 +552,7 @@ PUBLIC void nwk_sendData(uint16 * data_ptr, uint16 size)
 			if(eStatus != ZPS_E_SUCCESS)
 			{
 				/* Problem with request */
-				DBG_vPrintf(TRACE_APP, "  APP: AckDataReq not successful, status = %d\n\r", status);
+				DBG_vPrintf(TRACE_APP, "  APP: AckDataReq not successful, status = %d\n\r", eStatus);
 				//TODO: Add strike count and handle error
 			}
 		}
