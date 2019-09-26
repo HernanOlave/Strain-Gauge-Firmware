@@ -13,6 +13,8 @@
 
 #include <jendefs.h>
 
+#include "AppHardwareApi.h"
+
 #include "nd005_api.h"
 #include "mcp3204.h"
 #include "ad8231.h"

@@ -215,8 +215,7 @@ PRIVATE void app_vMainloop(void)
 		if(app_currentState != app_previousState)
 		{
 			if (app_currentState != SLEEP_STATE)
-{
-
+			{
 				ZTIMER_eStop(u8TimerWatchdog);
 				ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
 			}
@@ -263,13 +262,6 @@ PRIVATE void app_vMainloop(void)
 				ZTIMER_eStop(u8TimerWatchdog);
 
 				nd005_lowPower(TRUE);
-
-				DBG_vPrintf
-				(
-					TRACE_APP,
-					"APP: PWRM_u16GetActivityCount = %d\n\r",
-					PWRM_u16GetActivityCount()
-				);
 
 				DBG_vPrintf
 				(
