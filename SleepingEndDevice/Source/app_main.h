@@ -101,6 +101,8 @@ PRIVATE ZPS_tsAfEvent asStackEvents[ZPS_QUEUE_SIZE];
 
 PRIVATE ZTIMER_tsTimer asTimers[4];
 
+PRIVATE bool lockFlag = FALSE;
+
 PRIVATE sleepingEndDeviceStates_t app_currentState;
 PRIVATE sleepingEndDeviceStates_t app_previousState;
 
@@ -114,7 +116,9 @@ PRIVATE sleepingEndDeviceStates_t app_previousState;
 /****************************************************************************/
 
 PUBLIC uint8 u8TimerWatchdog;
-PUBLIC pwrm_tsWakeTimerEvent sWake;
+
+PUBLIC pwrm_tsWakeTimerEvent sPoll;
+PUBLIC pwrm_tsWakeTimerEvent sData;
 
 extern tszQueue zps_msgMlmeDcfmInd;
 extern tszQueue zps_msgMcpsDcfm;

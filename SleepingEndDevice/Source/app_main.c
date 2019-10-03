@@ -177,11 +177,55 @@ PRIVATE PWRM_CALLBACK(Wakeup)
     ZTIMER_vWake();
 }
 
-PRIVATE void vWakeCallBack(void)
+PRIVATE void vPollCallBack(void)
 {
-	DBG_vPrintf(TRACE_APP, "\n\r\n\r*** WAKE UP ROUTINE ***\n\r");
-	DBG_vPrintf(TRACE_APP, "APP: WAKE_UP_STATE\n\r");
-	app_currentState = WAKE_UP_STATE;
+	if(lockFlag)
+	{
+		/* Set wakeup time */
+		PWRM_eScheduleActivity
+		(
+			&sPoll,
+			SECS_TO_TICKS(1),
+			vPollCallBack
+		);
+	}
+	else
+	{
+		lockFlag = TRUE;
+
+		ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
+
+		/* Poll data from Stack */
+		ZPS_eAplZdoPoll();
+
+		DBG_vPrintf(TRACE_APP, "\n\r\n\r*** WAKE UP ROUTINE ***\n\r");
+		DBG_vPrintf(TRACE_APP, "APP: POLL_DATA_STATE\n\r");
+		app_currentState = POLL_DATA_STATE;
+	}
+}
+
+PRIVATE void vDataCallBack(void)
+{
+	if(lockFlag)
+	{
+		/* Set wakeup time */
+		PWRM_eScheduleActivity
+		(
+			&sData,
+			SECS_TO_TICKS(1),
+			vDataCallBack
+		);
+	}
+	else
+	{
+		lockFlag = TRUE;
+
+		ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
+
+		DBG_vPrintf(TRACE_APP, "\n\r\n\r*** WAKE UP ROUTINE ***\n\r");
+		DBG_vPrintf(TRACE_APP, "APP: SEND_DATA_STATE\n\r");
+		app_currentState = SEND_DATA_STATE;
+	}
 }
 
 PUBLIC void APP_cbTimerWatchdog(void *pvParam)
@@ -253,7 +297,8 @@ PRIVATE void app_vMainloop(void)
 
 			case SEND_DATA_STATE:
 			{
-
+				DBG_vPrintf(TRACE_APP, "\n\rAPP: PREP_TO_SLEEP_STATE\n\r");
+				app_currentState = PREP_TO_SLEEP_STATE;
 			}
 			break;
 
@@ -261,7 +306,7 @@ PRIVATE void app_vMainloop(void)
 			{
 				ZTIMER_eStop(u8TimerWatchdog);
 
-				nd005_lowPower(TRUE);
+				lockFlag = FALSE;
 
 				DBG_vPrintf
 				(
@@ -273,9 +318,17 @@ PRIVATE void app_vMainloop(void)
 				/* Set wakeup time */
 				PWRM_eScheduleActivity
 				(
-					&sWake,
-					SECS_TO_TICKS(5),
-					vWakeCallBack
+					&sData,
+					SECS_TO_TICKS(300),
+					vDataCallBack
+				);
+
+				/* Set wakeup time */
+				PWRM_eScheduleActivity
+				(
+					&sPoll,
+					SECS_TO_TICKS(60),
+					vPollCallBack
 				);
 
 				app_currentState = SLEEP_STATE;
@@ -285,21 +338,6 @@ PRIVATE void app_vMainloop(void)
 			case SLEEP_STATE:
 			{
 				/* Waits until OS sends the device to sleep */
-			}
-			break;
-
-			case WAKE_UP_STATE:
-			{
-				ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
-
-				nd005_init();
-				nd005_lowPower(FALSE);
-
-				/* Poll data from Stack */
-				ZPS_eAplZdoPoll();
-
-				DBG_vPrintf(TRACE_APP, "\n\rAPP: POLL_DATA_STATE\n\r");
-				app_currentState = POLL_DATA_STATE;
 			}
 			break;
 
