@@ -31,8 +31,6 @@
 /***        Local Function Prototypes                                     ***/
 /****************************************************************************/
 
-PRIVATE void vfExtendedStatusCallBack (ZPS_teExtendedStatus eExtendedStatus);
-
 /****************************************************************************/
 /***        Local Variables                                               ***/
 /****************************************************************************/
@@ -82,8 +80,8 @@ PUBLIC void vAppMain(void)
     ZTIMER_eInit(asTimers, sizeof(asTimers) / sizeof(ZTIMER_tsTimer));
 
     /* Create Z timers */
-    //ZTIMER_eOpen(&u8TimerWatchdog, APP_cbTimerWatchdog,  NULL, ZTIMER_FLAG_PREVENT_SLEEP);
-    //ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
+    ZTIMER_eOpen(&u8TimerWatchdog, APP_cbTimerWatchdog,  NULL, ZTIMER_FLAG_PREVENT_SLEEP);
+    ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
 
     /* Create Queues */
     ZQ_vQueueCreate(&zps_msgMlmeDcfmInd,         MLME_QUEQUE_SIZE,      sizeof(MAC_tsMlmeVsDcfmInd), (uint8*)asMacMlmeVsDcfmInd);
@@ -120,6 +118,9 @@ PUBLIC void vAppMain(void)
 
     /* Initialize network API */
     nwk_init();
+
+    /* Setup High power module */
+    vAppApiSetHighPowerMode(APP_API_MODULE_HPM06, TRUE);
 
     /* On startup, first state is POLL_DATA */
     DBG_vPrintf(TRACE_APP, "\n\rAPP: POLL_DATA_STATE\n\r");
@@ -192,7 +193,7 @@ PRIVATE void vPollCallBack(void)
 
 		nd005_init();
 
-		//ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
+		ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
 
 		/* Poll data from Stack */
 		ZPS_eAplZdoPoll();
@@ -219,7 +220,7 @@ PRIVATE void vDataCallBack(void)
 	{
 		lockFlag = TRUE;
 
-		//ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
+		ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
 
 		DBG_vPrintf(TRACE_APP, "\n\r\n\r*** WAKE UP ROUTINE ***\n\r");
 		DBG_vPrintf(TRACE_APP, "APP: SEND_DATA_STATE\n\r");
@@ -246,8 +247,8 @@ PRIVATE void APP_stateMachine(void)
 	{
 		if (app_currentState != SLEEP_STATE)
 		{
-			//ZTIMER_eStop(u8TimerWatchdog);
-			//ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
+			ZTIMER_eStop(u8TimerWatchdog);
+			ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
 		}
 		app_previousState = app_currentState;
 	}
@@ -271,8 +272,6 @@ PRIVATE void APP_stateMachine(void)
 				DBG_vPrintf(TRACE_APP, "\n\rAPP: PREP_TO_SLEEP_STATE\n\r");
 				app_currentState = PREP_TO_SLEEP_STATE;
 			}
-			DBG_vPrintf(TRACE_APP, "\n\rAPP: PREP_TO_SLEEP_STATE\n\r");
-			app_currentState = PREP_TO_SLEEP_STATE;
 		}
 		break;
 
@@ -294,12 +293,12 @@ PRIVATE void APP_stateMachine(void)
 		{
 			nd005_lowPower(TRUE);
 
-			/*DBG_vPrintf
+			DBG_vPrintf
 			(
 				TRACE_APP,
 				"APP: ZTIMER_eStop: %d\n\r",
 				ZTIMER_eStop(u8TimerWatchdog)
-			);*/
+			);
 
 			lockFlag = FALSE;
 
