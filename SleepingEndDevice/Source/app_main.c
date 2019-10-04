@@ -93,6 +93,8 @@ PUBLIC void vAppMain(void)
     ZQ_vQueueCreate(&APP_msgStrainGaugeEvents,   APP_QUEUE_SIZE,        sizeof(ZPS_tsAfEvent),       (uint8*)asAppEvents);
 	ZQ_vQueueCreate(&zps_msgMcpsDcfm,            MCPS_DCFM_QUEUE_SIZE,  sizeof(MAC_tsMcpsVsCfmData),(uint8*)asMacMcpsDcfm);
 
+	APP_vSetUpHardware();
+
     /* Initialize JenOS modules. Initialize Power Manager even on non-sleeping nodes
      * as it allows the device to doze when in the idle task
      */
@@ -104,20 +106,14 @@ PUBLIC void vAppMain(void)
      *  To use the key stored in eFuse set the pointer to the key to Null, and remove the
      *  key structure here.
      */
-	#ifdef PDM_EEPROM
 	PDM_eInitialise(63);
 	PDM_vRegisterSystemCallback(vPdmEventHandlerCallback);
-	#else
-	PDM_vInit(7, 1, 64 * 1024 , NULL, NULL, NULL, &g_sKey);
-	#endif
 
     /* Initialize Protocol Data Unit Manager */
     PDUM_vInit();
 
     /* Register callback that provides information about stack errors */
     ZPS_vExtendedStatusSetCallback(vfExtendedStatusCallBack);
-
-	APP_vSetUpHardware();
 
     /* Initialize application API */
     nd005_init();
@@ -153,6 +149,7 @@ PRIVATE void APP_vSetUpHardware(void)
 
 PRIVATE PWRM_CALLBACK(PreSleep)
 {
+	DBG_vPrintf(TRACE_APP, "\n\rAPP: PreSleep CB!\n\r");
     vAppApiSaveMacSettings();
     ZTIMER_vSleep();
 }
@@ -192,6 +189,8 @@ PRIVATE void vPollCallBack(void)
 	else
 	{
 		lockFlag = TRUE;
+
+		nd005_init();
 
 		ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
 
@@ -285,6 +284,8 @@ PRIVATE void app_vMainloop(void)
 					DBG_vPrintf(TRACE_APP, "\n\rAPP: PREP_TO_SLEEP_STATE\n\r");
 					app_currentState = PREP_TO_SLEEP_STATE;
 				}
+				DBG_vPrintf(TRACE_APP, "\n\rAPP: PREP_TO_SLEEP_STATE\n\r");
+				app_currentState = PREP_TO_SLEEP_STATE;
 			}
 			break;
 
@@ -304,7 +305,14 @@ PRIVATE void app_vMainloop(void)
 
 			case PREP_TO_SLEEP_STATE:
 			{
-				ZTIMER_eStop(u8TimerWatchdog);
+				nd005_lowPower(TRUE);
+
+				DBG_vPrintf
+				(
+					TRACE_APP,
+					"APP: ZTIMER_eStop: %d\n\r",
+					ZTIMER_eStop(u8TimerWatchdog)
+				);
 
 				lockFlag = FALSE;
 
@@ -312,22 +320,14 @@ PRIVATE void app_vMainloop(void)
 				(
 					TRACE_APP,
 					"APP: Sleep for %d seconds\n\r",
-					5
-				);
-
-				/* Set wakeup time */
-				PWRM_eScheduleActivity
-				(
-					&sData,
-					SECS_TO_TICKS(300),
-					vDataCallBack
+					10
 				);
 
 				/* Set wakeup time */
 				PWRM_eScheduleActivity
 				(
 					&sPoll,
-					SECS_TO_TICKS(60),
+					SECS_TO_TICKS(10),
 					vPollCallBack
 				);
 

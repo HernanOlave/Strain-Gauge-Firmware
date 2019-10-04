@@ -99,7 +99,7 @@ PRIVATE MAC_tsMlmeVsDcfmInd  asMacMlmeVsDcfmInd[MLME_QUEQUE_SIZE];
 PRIVATE ZPS_tsAfEvent asAppEvents[APP_QUEUE_SIZE];
 PRIVATE ZPS_tsAfEvent asStackEvents[ZPS_QUEUE_SIZE];
 
-PRIVATE ZTIMER_tsTimer asTimers[4];
+PRIVATE ZTIMER_tsTimer asTimers[1];
 
 PRIVATE bool lockFlag = FALSE;
 

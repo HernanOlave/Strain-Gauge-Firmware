@@ -70,7 +70,7 @@ PUBLIC void nd005_init(void)
 	/* Initialize ltc1661 */
 	ltc1661_init();
 
-	nd005_lowPower(FALSE);
+	nd005_lowPower(TRUE);
 }
 
 PUBLIC void nd005_lowPower(uint8 enable)
@@ -83,11 +83,11 @@ PUBLIC void nd005_lowPower(uint8 enable)
 		/* Put ltc1661 to sleep */
 		ltc1661_sleep();
 
-		/* Enable Powersave Mode */
-		vAHI_DioSetOutput(0x0, (1 << POWERSAVE_PIN));
-
 		/* Disable Wheatstone Bridge */
 		vAHI_DioSetOutput((1 << WB_ENABLE_PIN), 0x0);
+
+		/* Enable Powersave Mode */
+		vAHI_DioSetOutput(0x0, (1 << POWERSAVE_PIN));
 	}
 	else
 	{
