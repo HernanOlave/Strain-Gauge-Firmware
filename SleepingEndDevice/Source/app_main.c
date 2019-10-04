@@ -82,8 +82,8 @@ PUBLIC void vAppMain(void)
     ZTIMER_eInit(asTimers, sizeof(asTimers) / sizeof(ZTIMER_tsTimer));
 
     /* Create Z timers */
-    ZTIMER_eOpen(&u8TimerWatchdog, APP_cbTimerWatchdog,  NULL, ZTIMER_FLAG_PREVENT_SLEEP);
-    ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
+    //ZTIMER_eOpen(&u8TimerWatchdog, APP_cbTimerWatchdog,  NULL, ZTIMER_FLAG_PREVENT_SLEEP);
+    //ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
 
     /* Create Queues */
     ZQ_vQueueCreate(&zps_msgMlmeDcfmInd,         MLME_QUEQUE_SIZE,      sizeof(MAC_tsMlmeVsDcfmInd), (uint8*)asMacMlmeVsDcfmInd);
@@ -192,7 +192,7 @@ PRIVATE void vPollCallBack(void)
 
 		nd005_init();
 
-		ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
+		//ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
 
 		/* Poll data from Stack */
 		ZPS_eAplZdoPoll();
@@ -219,7 +219,7 @@ PRIVATE void vDataCallBack(void)
 	{
 		lockFlag = TRUE;
 
-		ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
+		//ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
 
 		DBG_vPrintf(TRACE_APP, "\n\r\n\r*** WAKE UP ROUTINE ***\n\r");
 		DBG_vPrintf(TRACE_APP, "APP: SEND_DATA_STATE\n\r");
@@ -239,6 +239,109 @@ PRIVATE void vfExtendedStatusCallBack (ZPS_teExtendedStatus eExtendedStatus)
     DBG_vPrintf(TRACE_APP, "ERROR: EPID: 0x%016llx\n", ZPS_u64AplZdoGetNetworkExtendedPanId());
 }
 
+PRIVATE void APP_stateMachine(void)
+{
+	/* State machine watchdog */
+	if(app_currentState != app_previousState)
+	{
+		if (app_currentState != SLEEP_STATE)
+		{
+			//ZTIMER_eStop(u8TimerWatchdog);
+			//ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
+		}
+		app_previousState = app_currentState;
+	}
+
+	//if (s_eDevice.systemStrikes >= 5) vAHI_SwReset();
+
+	/* Main State Machine */
+	switch (app_currentState)
+	{
+		case POLL_DATA_STATE:
+		{
+			uint8 pollStatus = nwk_getPollStatus();
+
+			if(pollStatus == NWK_NEW_MESSAGE)
+			{
+				DBG_vPrintf(TRACE_APP, "\n\rAPP: HANDLE_DATA_STATE\n\r");
+				app_currentState = HANDLE_DATA_STATE;
+			}
+			else if (pollStatus == NWK_NO_MESSAGE)
+			{
+				DBG_vPrintf(TRACE_APP, "\n\rAPP: PREP_TO_SLEEP_STATE\n\r");
+				app_currentState = PREP_TO_SLEEP_STATE;
+			}
+			DBG_vPrintf(TRACE_APP, "\n\rAPP: PREP_TO_SLEEP_STATE\n\r");
+			app_currentState = PREP_TO_SLEEP_STATE;
+		}
+		break;
+
+		case HANDLE_DATA_STATE:
+		{
+			DBG_vPrintf(TRACE_APP, "\n\rAPP: PREP_TO_SLEEP_STATE\n\r");
+			app_currentState = PREP_TO_SLEEP_STATE;
+		}
+		break;
+
+		case SEND_DATA_STATE:
+		{
+			DBG_vPrintf(TRACE_APP, "\n\rAPP: PREP_TO_SLEEP_STATE\n\r");
+			app_currentState = PREP_TO_SLEEP_STATE;
+		}
+		break;
+
+		case PREP_TO_SLEEP_STATE:
+		{
+			nd005_lowPower(TRUE);
+
+			/*DBG_vPrintf
+			(
+				TRACE_APP,
+				"APP: ZTIMER_eStop: %d\n\r",
+				ZTIMER_eStop(u8TimerWatchdog)
+			);*/
+
+			lockFlag = FALSE;
+
+			DBG_vPrintf
+			(
+				TRACE_APP,
+				"APP: Sleep for %d seconds\n\r",
+				10
+			);
+
+			/* Set wakeup time */
+			PWRM_eScheduleActivity
+			(
+				&sPoll,
+				SECS_TO_TICKS(10),
+				vPollCallBack
+			);
+
+			app_currentState = SLEEP_STATE;
+		}
+		break;
+
+		case SLEEP_STATE:
+		{
+			/* Waits until OS sends the device to sleep */
+		}
+		break;
+
+		default:
+		{
+			//TODO: Handle error
+			DBG_vPrintf
+			(
+				TRACE_APP,
+				"APP: Unhandled State : %d\n\r",
+				app_currentState
+			);
+		}
+		break;
+	}
+}
+
 /****************************************************************************/
 /***        MAIN LOOP	                                                  ***/
 /****************************************************************************/
@@ -249,110 +352,11 @@ PRIVATE void app_vMainloop(void)
 	{
 		zps_taskZPS();
 		nwk_taskHandler();
+		APP_stateMachine();
 		ZTIMER_vTask();
 		/* kick the watchdog timer */
 		vAHI_WatchdogRestart();
 		PWRM_vManagePower();
-
-		/* State machine watchdog */
-		if(app_currentState != app_previousState)
-		{
-			if (app_currentState != SLEEP_STATE)
-			{
-				ZTIMER_eStop(u8TimerWatchdog);
-				ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
-			}
-			app_previousState = app_currentState;
-		}
-
-		//if (s_eDevice.systemStrikes >= 5) vAHI_SwReset();
-
-		/* Main State Machine */
-		switch (app_currentState)
-		{
-			case POLL_DATA_STATE:
-			{
-				uint8 pollStatus = nwk_getPollStatus();
-
-				if(pollStatus == NWK_NEW_MESSAGE)
-				{
-					DBG_vPrintf(TRACE_APP, "\n\rAPP: HANDLE_DATA_STATE\n\r");
-					app_currentState = HANDLE_DATA_STATE;
-				}
-				else if (pollStatus == NWK_NO_MESSAGE)
-				{
-					DBG_vPrintf(TRACE_APP, "\n\rAPP: PREP_TO_SLEEP_STATE\n\r");
-					app_currentState = PREP_TO_SLEEP_STATE;
-				}
-				DBG_vPrintf(TRACE_APP, "\n\rAPP: PREP_TO_SLEEP_STATE\n\r");
-				app_currentState = PREP_TO_SLEEP_STATE;
-			}
-			break;
-
-			case HANDLE_DATA_STATE:
-			{
-				DBG_vPrintf(TRACE_APP, "\n\rAPP: PREP_TO_SLEEP_STATE\n\r");
-				app_currentState = PREP_TO_SLEEP_STATE;
-			}
-			break;
-
-			case SEND_DATA_STATE:
-			{
-				DBG_vPrintf(TRACE_APP, "\n\rAPP: PREP_TO_SLEEP_STATE\n\r");
-				app_currentState = PREP_TO_SLEEP_STATE;
-			}
-			break;
-
-			case PREP_TO_SLEEP_STATE:
-			{
-				nd005_lowPower(TRUE);
-
-				DBG_vPrintf
-				(
-					TRACE_APP,
-					"APP: ZTIMER_eStop: %d\n\r",
-					ZTIMER_eStop(u8TimerWatchdog)
-				);
-
-				lockFlag = FALSE;
-
-				DBG_vPrintf
-				(
-					TRACE_APP,
-					"APP: Sleep for %d seconds\n\r",
-					10
-				);
-
-				/* Set wakeup time */
-				PWRM_eScheduleActivity
-				(
-					&sPoll,
-					SECS_TO_TICKS(10),
-					vPollCallBack
-				);
-
-				app_currentState = SLEEP_STATE;
-			}
-			break;
-
-			case SLEEP_STATE:
-			{
-				/* Waits until OS sends the device to sleep */
-			}
-			break;
-
-			default:
-			{
-				//TODO: Handle error
-				DBG_vPrintf
-				(
-					TRACE_APP,
-					"APP: Unhandled State : %d\n\r",
-					app_currentState
-				);
-			}
-			break;
-		}
 	}
 }
 
