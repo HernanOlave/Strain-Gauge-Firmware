@@ -183,7 +183,7 @@ PRIVATE void networkPoll_handler(ZPS_tsAfEvent sStackEvent)
 	if(eStatus == MAC_ENUM_NO_DATA)
 	{
 		DBG_vPrintf(TRACE_APP,"  NWK: No new Data\n\r");
-		s_network.pollStatus = NWK_NO_MESSAGE;
+		s_network.pollStatus = NWK_POLL_NO_MESSAGE;
 	}
 
 	/* Success */
@@ -203,6 +203,8 @@ PRIVATE void networkPoll_handler(ZPS_tsAfEvent sStackEvent)
 			"  NWK: No Acknowledge received, strike = %d\n\r",
 			s_network.noNwkStrikes
 		);
+
+		s_network.pollStatus = NWK_POLL_NO_ACK;
 
 		/* if 3 strikes node loses connection */
 		if(s_network.noNwkStrikes >= MAX_NO_NWK_STRIKES)
@@ -306,7 +308,7 @@ PUBLIC void nwk_init(void)
 	s_network.rejoinStrikes = 0;
 	s_network.authStrikes = 0;
 
-	s_network.pollStatus = NWK_NO_EVENT;
+	s_network.pollStatus = NWK_POLL_NO_EVENT;
 
 	/* Initialize ZBPro stack */
 	ZPS_eAplAfInit();
@@ -348,7 +350,7 @@ PUBLIC void nwk_taskHandler(void)
 		case ZPS_EVENT_APS_DATA_INDICATION:
 		{
 			DBG_vPrintf(TRACE_APP, "  NWK: ZPS_EVENT_APS_DATA_INDICATION\n\r");
-			s_network.pollStatus = NWK_NEW_MESSAGE;
+			s_network.pollStatus = NWK_POLL_NEW_MESSAGE;
 			networkData_handler(sStackEvent);
 		}
 		break;
@@ -497,8 +499,13 @@ PUBLIC uint64 nwk_getEpid(void)
 PUBLIC pollReturnValues_t nwk_getPollStatus(void)
 {
 	uint8 temp = s_network.pollStatus;
-	s_network.pollStatus = NWK_NO_EVENT;
+	s_network.pollStatus = NWK_POLL_NO_EVENT;
 	return temp;
+}
+
+PUBLIC bool nwk_isConnected(void)
+{
+	return s_network.isConnected;
 }
 
 PUBLIC void nwk_sendData(uint16 * data_ptr, uint16 size)

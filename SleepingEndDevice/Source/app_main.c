@@ -122,9 +122,9 @@ PUBLIC void vAppMain(void)
     /* Setup High power module */
     vAppApiSetHighPowerMode(APP_API_MODULE_HPM06, TRUE);
 
-    /* On startup, first state is POLL_DATA */
-    DBG_vPrintf(TRACE_APP, "\n\rAPP: POLL_DATA_STATE\n\r");
-    app_currentState = POLL_DATA_STATE;
+    /* On startup, first state is CONNECTING_NWK_STATE */
+    DBG_vPrintf(TRACE_APP, "\n\rAPP: CONNECTING_NWK_STATE\n\r");
+    app_currentState = CONNECTING_NWK_STATE;
 
     /* Enter main loop */
     app_vMainloop();
@@ -173,6 +173,9 @@ PRIVATE PWRM_CALLBACK(Wakeup)
     APP_vSetUpHardware();
 
     ZTIMER_vWake();
+
+	nd005_init();
+	ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
 }
 
 PRIVATE void vPollCallBack(void)
@@ -191,16 +194,22 @@ PRIVATE void vPollCallBack(void)
 	{
 		lockFlag = TRUE;
 
-		nd005_init();
+		if(!nwk_isConnected())
+		{
+			/* Find a new network */
+			nwk_discovery();
+			DBG_vPrintf(TRACE_APP, "\n\rAPP: CONNECTING_NWK_STATE\n\r");
+			app_currentState = CONNECTING_NWK_STATE;
+		}
+		else
+		{
+			/* Poll data from Stack */
+			ZPS_eAplZdoPoll();
 
-		ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
-
-		/* Poll data from Stack */
-		ZPS_eAplZdoPoll();
-
-		DBG_vPrintf(TRACE_APP, "\n\r\n\r*** WAKE UP ROUTINE ***\n\r");
-		DBG_vPrintf(TRACE_APP, "APP: POLL_DATA_STATE\n\r");
-		app_currentState = POLL_DATA_STATE;
+			DBG_vPrintf(TRACE_APP, "\n\r\n\r*** WAKE UP ROUTINE ***\n\r");
+			DBG_vPrintf(TRACE_APP, "APP: POLL_DATA_STATE\n\r");
+			app_currentState = POLL_DATA_STATE;
+		}
 	}
 }
 
@@ -253,21 +262,30 @@ PRIVATE void APP_stateMachine(void)
 		app_previousState = app_currentState;
 	}
 
-	//if (s_eDevice.systemStrikes >= 5) vAHI_SwReset();
-
 	/* Main State Machine */
 	switch (app_currentState)
 	{
+		case CONNECTING_NWK_STATE:
+		{
+			if(nwk_isConnected())
+			{
+				DBG_vPrintf(TRACE_APP, "\n\rAPP: POLL_DATA_STATE\n\r");
+				app_currentState = POLL_DATA_STATE;
+			}
+		}
+		break;
+
 		case POLL_DATA_STATE:
 		{
 			uint8 pollStatus = nwk_getPollStatus();
 
-			if(pollStatus == NWK_NEW_MESSAGE)
+			if(pollStatus == NWK_POLL_NEW_MESSAGE)
 			{
 				DBG_vPrintf(TRACE_APP, "\n\rAPP: HANDLE_DATA_STATE\n\r");
 				app_currentState = HANDLE_DATA_STATE;
 			}
-			else if (pollStatus == NWK_NO_MESSAGE)
+			else if (pollStatus == NWK_POLL_NO_MESSAGE ||
+					 pollStatus == NWK_POLL_NO_ACK)
 			{
 				DBG_vPrintf(TRACE_APP, "\n\rAPP: PREP_TO_SLEEP_STATE\n\r");
 				app_currentState = PREP_TO_SLEEP_STATE;

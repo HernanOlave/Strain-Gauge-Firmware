@@ -24,10 +24,11 @@
 
 typedef enum
 {
-    NWK_NO_EVENT,
-    NWK_NEW_MESSAGE,
-    NWK_NO_MESSAGE,
-    NWK_UNK_ERROR
+    NWK_POLL_NO_EVENT,
+    NWK_POLL_NEW_MESSAGE,
+    NWK_POLL_NO_MESSAGE,
+    NWK_POLL_NO_ACK,
+    NWK_POLL_UNK_ERROR
 } pollReturnValues_t;
 
 /****************************************************************************/
@@ -88,6 +89,13 @@ PUBLIC uint64 nwk_getEpid(void);
  *  @return
  */
 PUBLIC pollReturnValues_t nwk_getPollStatus(void);
+
+/** @brief
+ *
+ *  @param
+ *  @return
+ */
+PUBLIC bool nwk_isConnected(void);
 
 /** @brief
  *
