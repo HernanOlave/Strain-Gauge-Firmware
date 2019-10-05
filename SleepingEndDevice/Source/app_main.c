@@ -173,6 +173,8 @@ PRIVATE PWRM_CALLBACK(Wakeup)
 
     ZTIMER_vWake();
 
+	DBG_vPrintf(TRACE_APP, "\n\r\n\r*** WAKE UP ROUTINE ***\n\r");
+
 	nd005_init();
 	ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
 }
@@ -182,12 +184,7 @@ PRIVATE void vPollCallBack(void)
 	if(lockFlag)
 	{
 		/* Set wakeup time */
-		PWRM_eScheduleActivity
-		(
-			&sPoll,
-			SECS_TO_TICKS(1),
-			vPollCallBack
-		);
+		PWRM_eScheduleActivity(&sPoll, SECS_TO_TICKS(1), vPollCallBack);
 	}
 	else
 	{
@@ -204,8 +201,6 @@ PRIVATE void vPollCallBack(void)
 		{
 			/* Poll data from Stack */
 			ZPS_eAplZdoPoll();
-
-			DBG_vPrintf(TRACE_APP, "\n\r\n\r*** WAKE UP ROUTINE ***\n\r");
 			DBG_vPrintf(TRACE_APP, "APP: POLL_DATA_STATE\n\r");
 			app_currentState = POLL_DATA_STATE;
 		}
@@ -238,6 +233,7 @@ PRIVATE void vDataCallBack(void)
 
 PUBLIC void APP_cbTimerWatchdog(void *pvParam)
 {
+	DBG_vPrintf(TRACE_APP, "APP: State machine watchdog timeout\n\r");
 	DBG_vPrintf(TRACE_APP, "\n\rAPP: PREP_TO_SLEEP_STATE\n\r");
 	app_currentState = PREP_TO_SLEEP_STATE;
 }
@@ -314,13 +310,7 @@ PRIVATE void APP_stateMachine(void)
 		case PREP_TO_SLEEP_STATE:
 		{
 			nd005_lowPower(TRUE);
-
-			DBG_vPrintf
-			(
-				TRACE_APP,
-				"APP: ZTIMER_eStop: %d\n\r",
-				ZTIMER_eStop(u8TimerWatchdog)
-			);
+			ZTIMER_eStop(u8TimerWatchdog);
 
 			lockFlag = FALSE;
 
