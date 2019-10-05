@@ -31,6 +31,14 @@ typedef enum
     NWK_POLL_UNK_ERROR
 } pollReturnValues_t;
 
+typedef enum
+{
+    NWK_DISC_NO_EVENT,
+    NWK_DISC_FAIL,
+    NWK_DISC_JOIN_NOT_PERMITTED,
+    NWK_DISC_UNK_ERROR
+} discReturnValues_t;
+
 /****************************************************************************/
 /***        Local Variables                                               ***/
 /****************************************************************************/
@@ -82,6 +90,13 @@ PUBLIC void nwk_setEpid(uint64 epid);
  *  @return
  */
 PUBLIC uint64 nwk_getEpid(void);
+
+/** @brief
+ *
+ *  @param
+ *  @return
+ */
+PUBLIC discReturnValues_t nwk_getDiscStatus(void);
 
 /** @brief
  *

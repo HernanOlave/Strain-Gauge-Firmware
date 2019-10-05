@@ -57,11 +57,8 @@ typedef struct
 {
 	uint64				currentEpid;
 	bool				isConnected;
-	bool				isAuthenticated;
-	uint8				ackStrikes;
 	uint8				noNwkStrikes;
-	uint8				rejoinStrikes;
-	uint8				authStrikes;
+	discReturnValues_t	discStatus;
 	pollReturnValues_t	pollStatus;
 } networkDesc_t;
 
@@ -71,9 +68,6 @@ typedef struct
 
 PRIVATE networkDesc_t s_network;
 PRIVATE uint8 au8DefaultTCLinkKey[16] = "ZigBeeAlliance09";
-PRIVATE uint64 blacklistEpids[BLACKLIST_MAX] = { 0 };
-PRIVATE uint8  blacklistIndex = 0;
-PRIVATE tsBeaconFilterType discoverFilter;
 PRIVATE uint16 rxBuffer[RX_BUFFER_SIZE];
 
 /****************************************************************************/
@@ -90,7 +84,6 @@ tszQueue APP_msgZpsEvents;
 PRIVATE void networkDiscovery_handler(ZPS_tsAfEvent sStackEvent);
 PRIVATE void networkPoll_handler(ZPS_tsAfEvent sStackEvent);
 PRIVATE void networkData_handler(ZPS_tsAfEvent sStackEvent);
-PRIVATE void blacklistNetwork(void);
 
 /****************************************************************************/
 /***        Local Functions                                               ***/
@@ -109,7 +102,7 @@ PRIVATE void networkDiscovery_handler(ZPS_tsAfEvent sStackEvent)
 			"  NWK: Network discovery failed, status = 0x%02x\n\r",
 			sStackEvent.uEvent.sNwkDiscoveryEvent.eStatus
 		);
-		//TODO: Hanlde error
+		s_network.discStatus = NWK_DISC_FAIL;
 	}
 	else /* Discovery process successful */
 	{
@@ -152,7 +145,7 @@ PRIVATE void networkDiscovery_handler(ZPS_tsAfEvent sStackEvent)
 					"  NWK: Join not permitted, status = 0x%02x\n\r",
 					eStatus
 				);
-				//TODO: Handle error
+				s_network.discStatus = NWK_DISC_JOIN_NOT_PERMITTED;
 			}
 			else if (eStatus == ZPS_NWK_ENUM_INVALID_REQUEST)
 			{
@@ -166,7 +159,7 @@ PRIVATE void networkDiscovery_handler(ZPS_tsAfEvent sStackEvent)
 					"  NWK: Failed to request network join, status = 0x%02x\n\r",
 					eStatus
 				);
-				//TODO: Handle ERROR
+				s_network.discStatus = NWK_DISC_UNK_ERROR;
 			}
 		}
 	}
@@ -222,6 +215,7 @@ PRIVATE void networkPoll_handler(ZPS_tsAfEvent sStackEvent)
 			"  NWK: Unexpected poll complete, status = 0x%02x\n\r",
 			eStatus
 		);
+		s_network.pollStatus = NWK_POLL_UNK_ERROR;
 	}
 }
 
@@ -268,30 +262,6 @@ PRIVATE void networkData_handler(ZPS_tsAfEvent sStackEvent)
 	PDUM_eAPduFreeAPduInstance(sStackEvent.uEvent.sApsDataIndEvent.hAPduInst);
 }
 
-PRIVATE void blacklistNetwork(void)
-{
-    /* Add EPID to blacklist */
-	DBG_vPrintf(TRACE_APP, "  APP: Blacklisting Network: 0x%016llx\n\r", ZPS_u64AplZdoGetNetworkExtendedPanId());
-    blacklistEpids[ blacklistIndex++ ] = ZPS_u64AplZdoGetNetworkExtendedPanId();
-
-    ZPS_eAplAibSetApsUseExtendedPanId(0);
-
-    s_network.isConnected = FALSE;
-    s_network.isAuthenticated = FALSE;
-
-    /* Leave request */
-    ZPS_teStatus status = ZPS_eAplZdoLeaveNetwork
-    (
-    	0,
-        FALSE,
-        FALSE
-    );
-    if( status != ZPS_E_SUCCESS )
-    {
-        DBG_vPrintf(TRACE_APP, " APP: LeaveNetwork Request Failed, status = 0x%02x\n\r", status);
-    }
-}
-
 /****************************************************************************/
 /***        Exported Functions                                            ***/
 /****************************************************************************/
@@ -300,14 +270,8 @@ PUBLIC void nwk_init(void)
 {
 	DBG_vPrintf(TRACE_APP, "  NWK: Initializing network API\n\r");
 
-	s_network.isAuthenticated = FALSE;
 	s_network.isConnected = FALSE;
-
-	s_network.ackStrikes = 0;
 	s_network.noNwkStrikes = 0;
-	s_network.rejoinStrikes = 0;
-	s_network.authStrikes = 0;
-
 	s_network.pollStatus = NWK_POLL_NO_EVENT;
 
 	/* Initialize ZBPro stack */
@@ -440,21 +404,9 @@ PUBLIC void nwk_discovery(void)
 			(TRACE_APP, "  NWK: Failed rejoin request, status = 0x%02x\n\r", eStatus);
 			//TODO: Handle errors
 		}
-		else
-		{
-			//TODO: Review this
-			s_network.isAuthenticated = TRUE;
-		}
 	}
 	else /* Discovery */
 	{
-		/* Create Beacon filter */
-		discoverFilter.pu64ExtendPanIdList = blacklistEpids;
-		discoverFilter.u8ListSize = blacklistIndex;
-		discoverFilter.u16FilterMap = (BF_BITMAP_BLACKLIST);
-
-		ZPS_bAppAddBeaconFilter(&discoverFilter);
-
 		/* Reset nwk params */
 		void * pvNwk = ZPS_pvAplZdoGetNwkHandle();
 		ZPS_vNwkNibSetExtPanId(pvNwk, 0);
@@ -494,6 +446,13 @@ PUBLIC void nwk_setEpid(uint64 epid)
 PUBLIC uint64 nwk_getEpid(void)
 {
 	return s_network.currentEpid;
+}
+
+PUBLIC discReturnValues_t nwk_getDiscStatus(void)
+{
+	uint8 temp = s_network.discStatus;
+	s_network.discStatus = NWK_DISC_NO_EVENT;
+	return temp;
 }
 
 PUBLIC pollReturnValues_t nwk_getPollStatus(void)

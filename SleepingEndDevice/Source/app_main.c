@@ -150,7 +150,6 @@ PRIVATE void APP_vSetUpHardware(void)
 
 PRIVATE PWRM_CALLBACK(PreSleep)
 {
-	DBG_vPrintf(TRACE_APP, "\n\rAPP: PreSleep CB!\n\r");
     vAppApiSaveMacSettings();
     ZTIMER_vSleep();
 }
@@ -267,6 +266,11 @@ PRIVATE void APP_stateMachine(void)
 	{
 		case CONNECTING_NWK_STATE:
 		{
+			if(nwk_getDiscStatus() != NWK_DISC_NO_EVENT)
+			{
+				DBG_vPrintf(TRACE_APP, "\n\rAPP: PREP_TO_SLEEP_STATE\n\r");
+				app_currentState = PREP_TO_SLEEP_STATE;
+			}
 			if(nwk_isConnected())
 			{
 				DBG_vPrintf(TRACE_APP, "\n\rAPP: POLL_DATA_STATE\n\r");
