@@ -117,6 +117,13 @@ PUBLIC bool nwk_isConnected(void);
  *  @param
  *  @return
  */
+PUBLIC void nwk_getData(uint16 * buffer_ptr);
+
+/** @brief
+ *
+ *  @param
+ *  @return
+ */
 PUBLIC void nwk_sendData(uint16 * data_ptr, uint16 size);
 
 

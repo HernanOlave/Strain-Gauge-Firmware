@@ -65,8 +65,6 @@
 #define APP_QUEUE_SIZE			2
 #define MCPS_DCFM_QUEUE_SIZE	8
 
-#define AUTH_CODE				0xE241171A
-
 #define SECS_TO_TICKS(seconds)	seconds * 32768
 #define STATE_MACHINE_WDG_TIME	ZTIMER_TIME_MSEC(5000)
 
@@ -90,9 +88,8 @@ typedef enum
 /***        Local Variables                                               ***/
 /****************************************************************************/
 
-PRIVATE void app_vMainloop(void);
-PRIVATE void APP_vSetUpHardware(void);
-PRIVATE void vfExtendedStatusCallBack (ZPS_teExtendedStatus eExtendedStatus);
+
+
 PRIVATE MAC_tsMcpsVsCfmData asMacMcpsDcfm[MCPS_DCFM_QUEUE_SIZE];
 PRIVATE zps_tsTimeEvent asTimeEvent[TIMER_QUEUE_SIZE];
 PRIVATE MAC_tsMcpsVsDcfmInd asMacMcpsDcfmInd[MCPS_QUEUE_SIZE];
@@ -107,10 +104,16 @@ PRIVATE bool lockFlag = FALSE;
 PRIVATE sleepingEndDeviceStates_t app_currentState;
 PRIVATE sleepingEndDeviceStates_t app_previousState;
 
+PRIVATE uint16 APP_rxBuffer[50];
+
 /****************************************************************************/
 /***        Local Functions                                               ***/
 /****************************************************************************/
 
+PRIVATE void app_vMainloop(void);
+PRIVATE void APP_vSetUpHardware(void);
+PRIVATE void vfExtendedStatusCallBack (ZPS_teExtendedStatus eExtendedStatus);
+PRIVATE void APP_stateMachine(void);
 
 /****************************************************************************/
 /***        Exported Variables                                            ***/

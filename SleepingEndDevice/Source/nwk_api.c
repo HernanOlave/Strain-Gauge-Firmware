@@ -45,7 +45,6 @@
 	#define TRACE_APP 		TRUE
 #endif
 
-#define BLACKLIST_MAX   	32		// max number of blacklist EPIDs
 #define MAX_NO_NWK_STRIKES	3		// times (fixed by ZPS_Config Editor)
 #define RX_BUFFER_SIZE		50		//
 
@@ -221,13 +220,14 @@ PRIVATE void networkPoll_handler(ZPS_tsAfEvent sStackEvent)
 
 PRIVATE void networkData_handler(ZPS_tsAfEvent sStackEvent)
 {
+	memset(rxBuffer, 0, RX_BUFFER_SIZE);
+
 	/* Process incoming cluster messages ... */
 	DBG_vPrintf(TRACE_APP, "    Profile :%x\r\n",sStackEvent.uEvent.sApsDataIndEvent.u16ProfileId);
 	DBG_vPrintf(TRACE_APP, "    Cluster :%x\r\n",sStackEvent.uEvent.sApsDataIndEvent.u16ClusterId);
 	DBG_vPrintf(TRACE_APP, "    EndPoint:%x\r\n",sStackEvent.uEvent.sApsDataIndEvent.u8DstEndpoint);
 
-	uint16 payloadSize, byteCount;
-
+	uint16 payloadSize, byteCount, temp;
 	payloadSize = PDUM_u16APduInstanceGetPayloadSize(sStackEvent.uEvent.sApsDataIndEvent.hAPduInst);
 
 	byteCount = PDUM_u16APduInstanceReadNBO
@@ -235,11 +235,13 @@ PRIVATE void networkData_handler(ZPS_tsAfEvent sStackEvent)
 		sStackEvent.uEvent.sApsDataIndEvent.hAPduInst,
 		0,
 		"b",
-		&rxBuffer
+		&temp
 	);
 
-	DBG_vPrintf( TRACE_APP, "  NWK: byteCount  = %d - idByte = %c\n\r", byteCount, rxBuffer[0]);
-	DBG_vPrintf( TRACE_APP, "  NWK: payloadSize  = %d\n\r", payloadSize);
+	rxBuffer[0] = temp;
+
+	DBG_vPrintf( TRACE_APP, "  NWK: byteCount  = %d - idByte = %d\n\r", byteCount, temp);
+	DBG_vPrintf( TRACE_APP, "  NWK: payloadSize  = %d - ", payloadSize);
 
 	uint16 offset, index;
 
@@ -248,15 +250,19 @@ PRIVATE void networkData_handler(ZPS_tsAfEvent sStackEvent)
 
 	while (offset <= payloadSize - 2)
 	{
-
 		offset += PDUM_u16APduInstanceReadNBO
 		(
 			sStackEvent.uEvent.sApsDataIndEvent.hAPduInst,
 			offset,
 			"h",
-			&rxBuffer[index++]
+			&temp
 		);
+
+		rxBuffer[index++] = temp;
+
+		DBG_vPrintf( TRACE_APP, " %d", temp);
 	}
+	DBG_vPrintf( TRACE_APP, "\n\r");
 
 	/* free the application protocol data unit (APDU) once it has been dealt with */
 	PDUM_eAPduFreeAPduInstance(sStackEvent.uEvent.sApsDataIndEvent.hAPduInst);
@@ -314,8 +320,8 @@ PUBLIC void nwk_taskHandler(void)
 		case ZPS_EVENT_APS_DATA_INDICATION:
 		{
 			DBG_vPrintf(TRACE_APP, "  NWK: ZPS_EVENT_APS_DATA_INDICATION\n\r");
-			s_network.pollStatus = NWK_POLL_NEW_MESSAGE;
 			networkData_handler(sStackEvent);
+			s_network.pollStatus = NWK_POLL_NEW_MESSAGE;
 		}
 		break;
 
@@ -467,6 +473,16 @@ PUBLIC bool nwk_isConnected(void)
 	return s_network.isConnected;
 }
 
+PUBLIC void nwk_getData(uint16 * buffer_ptr)
+{
+	uint8 i;
+
+	for(i = 0; i < RX_BUFFER_SIZE; i++)
+	{
+		buffer_ptr[i] = rxBuffer[i];
+	}
+}
+
 PUBLIC void nwk_sendData(uint16 * data_ptr, uint16 size)
 {
 	DBG_vPrintf(TRACE_APP, "  APP: Sending data to Coordinator\n\r");
@@ -476,7 +492,7 @@ PUBLIC void nwk_sendData(uint16 * data_ptr, uint16 size)
 	if(data == PDUM_INVALID_HANDLE)
 	{
 		/* Problem allocating APDU instance memory */
-		DBG_vPrintf(TRACE_APP, "  APP: Unable to allocate APDU memory\n\r");
+		DBG_vPrintf(TRACE_APP, "  NWK: Unable to allocate APDU memory\n\r");
 		//TODO: Handle error
 	}
 	else

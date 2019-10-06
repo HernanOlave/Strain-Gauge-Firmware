@@ -137,6 +137,24 @@ void vAppRegisterPWRMCallbacks(void)
 }
 
 /****************************************************************************/
+/***        MAIN LOOP	                                                  ***/
+/****************************************************************************/
+
+PRIVATE void app_vMainloop(void)
+{
+	while (TRUE)
+	{
+		zps_taskZPS();
+		nwk_taskHandler();
+		APP_stateMachine();
+		ZTIMER_vTask();
+		/* kick the watchdog timer */
+		vAHI_WatchdogRestart();
+		PWRM_vManagePower();
+	}
+}
+
+/****************************************************************************/
 /***        Local Functions                                               ***/
 /****************************************************************************/
 
@@ -171,9 +189,9 @@ PRIVATE PWRM_CALLBACK(Wakeup)
 
     APP_vSetUpHardware();
 
-    ZTIMER_vWake();
-
 	DBG_vPrintf(TRACE_APP, "\n\r\n\r*** WAKE UP ROUTINE ***\n\r");
+
+    ZTIMER_vWake();
 
 	nd005_init();
 	ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
@@ -295,6 +313,15 @@ PRIVATE void APP_stateMachine(void)
 
 		case HANDLE_DATA_STATE:
 		{
+			nwk_getData(APP_rxBuffer);
+
+			DBG_vPrintf(TRACE_APP, "APP: Data: %c ", APP_rxBuffer[0]);
+			DBG_vPrintf(TRACE_APP, "%d ", APP_rxBuffer[1]);
+			DBG_vPrintf(TRACE_APP, "%d ", APP_rxBuffer[2]);
+			DBG_vPrintf(TRACE_APP, "%d ", APP_rxBuffer[3]);
+			DBG_vPrintf(TRACE_APP, "%d ", APP_rxBuffer[4]);
+			DBG_vPrintf(TRACE_APP, "%d ", APP_rxBuffer[5]);
+
 			DBG_vPrintf(TRACE_APP, "\n\rAPP: PREP_TO_SLEEP_STATE\n\r");
 			app_currentState = PREP_TO_SLEEP_STATE;
 		}
@@ -350,24 +377,6 @@ PRIVATE void APP_stateMachine(void)
 			);
 		}
 		break;
-	}
-}
-
-/****************************************************************************/
-/***        MAIN LOOP	                                                  ***/
-/****************************************************************************/
-
-PRIVATE void app_vMainloop(void)
-{
-	while (TRUE)
-	{
-		zps_taskZPS();
-		nwk_taskHandler();
-		APP_stateMachine();
-		ZTIMER_vTask();
-		/* kick the watchdog timer */
-		vAHI_WatchdogRestart();
-		PWRM_vManagePower();
 	}
 }
 
