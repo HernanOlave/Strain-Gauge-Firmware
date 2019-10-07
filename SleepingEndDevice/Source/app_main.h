@@ -88,8 +88,6 @@ typedef enum
 /***        Local Variables                                               ***/
 /****************************************************************************/
 
-
-
 PRIVATE MAC_tsMcpsVsCfmData asMacMcpsDcfm[MCPS_DCFM_QUEUE_SIZE];
 PRIVATE zps_tsTimeEvent asTimeEvent[TIMER_QUEUE_SIZE];
 PRIVATE MAC_tsMcpsVsDcfmInd asMacMcpsDcfmInd[MCPS_QUEUE_SIZE];
@@ -105,15 +103,17 @@ PRIVATE sleepingEndDeviceStates_t app_currentState;
 PRIVATE sleepingEndDeviceStates_t app_previousState;
 
 PRIVATE uint16 APP_rxBuffer[50];
+PRIVATE uint16 APP_txBuffer[50];
 
 /****************************************************************************/
 /***        Local Functions                                               ***/
 /****************************************************************************/
 
-PRIVATE void app_vMainloop(void);
+PRIVATE void APP_vMainloop(void);
 PRIVATE void APP_vSetUpHardware(void);
 PRIVATE void vfExtendedStatusCallBack (ZPS_teExtendedStatus eExtendedStatus);
 PRIVATE void APP_stateMachine(void);
+PRIVATE void APP_handleData(uint16 * data_ptr);
 
 /****************************************************************************/
 /***        Exported Variables                                            ***/

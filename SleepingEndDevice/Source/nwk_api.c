@@ -486,7 +486,7 @@ PUBLIC void nwk_getData(uint16 * buffer_ptr)
 
 PUBLIC void nwk_sendData(uint16 * data_ptr, uint16 size)
 {
-	DBG_vPrintf(TRACE_APP, "  APP: Sending data to Coordinator\n\r");
+	DBG_vPrintf(TRACE_APP, "  NWK: Sending data to Coordinator\n\r");
 
 	/* Allocate memory for APDU buffer with preconfigured "type" */
 	PDUM_thAPduInstance data = PDUM_hAPduAllocateAPduInstance(apduMyData);
@@ -501,13 +501,22 @@ PUBLIC void nwk_sendData(uint16 * data_ptr, uint16 size)
 		uint16 byteCount, index;
 		PDUM_teStatus eStatus;
 
-		for(index = 0; index < size; index++)
+		/* Load header into APDU */
+		byteCount = PDUM_u16APduInstanceWriteNBO
+		(
+			data,	// APDU instance handle
+			0,		// APDU position for data
+			"b",	// data format string
+			data_ptr[0]
+		);
+
+		for(index = 1; index < size; index++)
 		{
 			/* Load payload data into APDU */
-			byteCount = PDUM_u16APduInstanceWriteNBO
+			byteCount += PDUM_u16APduInstanceWriteNBO
 			(
 				data,	// APDU instance handle
-				index,	// APDU position for data
+				byteCount,	// APDU position for data
 				"h",	// data format string
 				data_ptr[index]
 			);
@@ -516,13 +525,13 @@ PUBLIC void nwk_sendData(uint16 * data_ptr, uint16 size)
 		if( byteCount == 0 )
 		{
 			/* No data was written to the APDU instance */
-			DBG_vPrintf(TRACE_APP, "  APP: No data written to APDU\n\r");
+			DBG_vPrintf(TRACE_APP, "  NWK: No data written to APDU\n\r");
 			//TODO: Handle error
 		}
 		else
 		{
 			PDUM_eAPduInstanceSetPayloadSize(data, byteCount);
-			DBG_vPrintf(TRACE_APP, "  APP: Data written to APDU: %d\n\r", byteCount);
+			DBG_vPrintf(TRACE_APP, "  NWK: Bytes written to APDU: %d\n\r", byteCount);
 
 			/* Request data send to destination */
 			eStatus = ZPS_eAplAfUnicastDataReq
@@ -540,7 +549,7 @@ PUBLIC void nwk_sendData(uint16 * data_ptr, uint16 size)
 			if(eStatus != ZPS_E_SUCCESS)
 			{
 				/* Problem with request */
-				DBG_vPrintf(TRACE_APP, "  APP: AckDataReq not successful, status = %d\n\r", eStatus);
+				DBG_vPrintf(TRACE_APP, "  NWK: AckDataReq not successful, status = %d\n\r", eStatus);
 				//TODO: Add strike count and handle error
 			}
 		}

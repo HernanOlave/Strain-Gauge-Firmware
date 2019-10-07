@@ -127,7 +127,7 @@ PUBLIC void vAppMain(void)
     app_currentState = CONNECTING_NWK_STATE;
 
     /* Enter main loop */
-    app_vMainloop();
+    APP_vMainloop();
 }
 
 void vAppRegisterPWRMCallbacks(void)
@@ -140,7 +140,7 @@ void vAppRegisterPWRMCallbacks(void)
 /***        MAIN LOOP	                                                  ***/
 /****************************************************************************/
 
-PRIVATE void app_vMainloop(void)
+PRIVATE void APP_vMainloop(void)
 {
 	while (TRUE)
 	{
@@ -230,22 +230,25 @@ PRIVATE void vDataCallBack(void)
 	if(lockFlag)
 	{
 		/* Set wakeup time */
-		PWRM_eScheduleActivity
-		(
-			&sData,
-			SECS_TO_TICKS(1),
-			vDataCallBack
-		);
+		PWRM_eScheduleActivity(&sData, SECS_TO_TICKS(1), vDataCallBack);
 	}
 	else
 	{
 		lockFlag = TRUE;
 
-		ZTIMER_eStart(u8TimerWatchdog, STATE_MACHINE_WDG_TIME);
-
-		DBG_vPrintf(TRACE_APP, "\n\r\n\r*** WAKE UP ROUTINE ***\n\r");
-		DBG_vPrintf(TRACE_APP, "APP: SEND_DATA_STATE\n\r");
-		app_currentState = SEND_DATA_STATE;
+		if(!nwk_isConnected())
+		{
+			/* Find a new network */
+			nwk_discovery();
+			DBG_vPrintf(TRACE_APP, "\n\rAPP: CONNECTING_NWK_STATE\n\r");
+			app_currentState = CONNECTING_NWK_STATE;
+		}
+		else
+		{
+			DBG_vPrintf(TRACE_APP, "\n\r\n\r*** WAKE UP ROUTINE ***\n\r");
+			DBG_vPrintf(TRACE_APP, "APP: SEND_DATA_STATE\n\r");
+			app_currentState = SEND_DATA_STATE;
+		}
 	}
 }
 
@@ -314,13 +317,7 @@ PRIVATE void APP_stateMachine(void)
 		case HANDLE_DATA_STATE:
 		{
 			nwk_getData(APP_rxBuffer);
-
-			DBG_vPrintf(TRACE_APP, "APP: Data: %c ", APP_rxBuffer[0]);
-			DBG_vPrintf(TRACE_APP, "%d ", APP_rxBuffer[1]);
-			DBG_vPrintf(TRACE_APP, "%d ", APP_rxBuffer[2]);
-			DBG_vPrintf(TRACE_APP, "%d ", APP_rxBuffer[3]);
-			DBG_vPrintf(TRACE_APP, "%d ", APP_rxBuffer[4]);
-			DBG_vPrintf(TRACE_APP, "%d \n\r", APP_rxBuffer[5]);
+			APP_handleData(APP_rxBuffer);
 
 			DBG_vPrintf(TRACE_APP, "\n\rAPP: PREP_TO_SLEEP_STATE\n\r");
 			app_currentState = PREP_TO_SLEEP_STATE;
@@ -329,6 +326,12 @@ PRIVATE void APP_stateMachine(void)
 
 		case SEND_DATA_STATE:
 		{
+			APP_txBuffer[0] = '*';
+			APP_txBuffer[1] = 255;
+			APP_txBuffer[2] = 0x0f01;
+			APP_txBuffer[3] = 1;
+			nwk_sendData(APP_txBuffer, 4);
+
 			DBG_vPrintf(TRACE_APP, "\n\rAPP: PREP_TO_SLEEP_STATE\n\r");
 			app_currentState = PREP_TO_SLEEP_STATE;
 		}
@@ -356,6 +359,14 @@ PRIVATE void APP_stateMachine(void)
 				vPollCallBack
 			);
 
+			/* Set wakeup time */
+			PWRM_eScheduleActivity
+			(
+				&sData,
+				SECS_TO_TICKS(30),
+				vDataCallBack
+			);
+
 			app_currentState = SLEEP_STATE;
 		}
 		break;
@@ -375,6 +386,41 @@ PRIVATE void APP_stateMachine(void)
 				"APP: Unhandled State : %d\n\r",
 				app_currentState
 			);
+		}
+		break;
+	}
+}
+
+PRIVATE void APP_handleData(uint16 * data_ptr)
+{
+	switch(data_ptr[0])
+	{
+		case '&':
+		{
+			DBG_vPrintf(TRACE_APP, "APP: Broadcast command received\n\r");
+			APP_txBuffer[0] = '&';
+			APP_txBuffer[1] = DEVICE_TYPE;
+			APP_txBuffer[2] = VERSION_MAJOR;
+			APP_txBuffer[3] = VERSION_MINOR;
+			nwk_sendData(APP_txBuffer, 4);
+		}
+		break;
+
+		case '~':
+		{
+			DBG_vPrintf(TRACE_APP, "APP: Configuration command received\n\r");
+		}
+		break;
+
+		case '$':
+		{
+			DBG_vPrintf(TRACE_APP, "APP: GO command received\n\r");
+		}
+		break;
+
+		default:
+		{
+			DBG_vPrintf(TRACE_APP, "APP: Unknown command received\n\r");
 		}
 		break;
 	}
