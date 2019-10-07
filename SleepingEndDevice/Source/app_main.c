@@ -320,7 +320,7 @@ PRIVATE void APP_stateMachine(void)
 			DBG_vPrintf(TRACE_APP, "%d ", APP_rxBuffer[2]);
 			DBG_vPrintf(TRACE_APP, "%d ", APP_rxBuffer[3]);
 			DBG_vPrintf(TRACE_APP, "%d ", APP_rxBuffer[4]);
-			DBG_vPrintf(TRACE_APP, "%d ", APP_rxBuffer[5]);
+			DBG_vPrintf(TRACE_APP, "%d \n\r", APP_rxBuffer[5]);
 
 			DBG_vPrintf(TRACE_APP, "\n\rAPP: PREP_TO_SLEEP_STATE\n\r");
 			app_currentState = PREP_TO_SLEEP_STATE;
