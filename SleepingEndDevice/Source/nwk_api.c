@@ -238,10 +238,11 @@ PRIVATE void networkData_handler(ZPS_tsAfEvent sStackEvent)
 		&temp
 	);
 
+	temp = temp >> 8;
 	rxBuffer[0] = temp;
 
-	DBG_vPrintf( TRACE_APP, "  NWK: byteCount  = %d - idByte = %d\n\r", byteCount, temp);
-	DBG_vPrintf( TRACE_APP, "  NWK: payloadSize  = %d - ", payloadSize);
+	DBG_vPrintf( TRACE_APP, "  NWK: byteCount  = %d - idByte = %c\n\r", byteCount, temp);
+	DBG_vPrintf( TRACE_APP, "  NWK: payloadSize  = %d - Payload: ", payloadSize);
 
 	uint16 offset, index;
 
