@@ -330,9 +330,9 @@ PRIVATE void APP_stateMachine(void)
 		case SEND_DATA_STATE:
 		{
 			APP_txBuffer[0] = '*';
-			APP_txBuffer[1] = 255;
-			APP_txBuffer[2] = 0x0f01;
-			APP_txBuffer[3] = 1;
+			APP_txBuffer[1] = nd005_getBattery();
+			APP_txBuffer[2] = nd005_getTemperature();
+			APP_txBuffer[3] = nd005_getSensorValue();
 			nwk_sendData(APP_txBuffer, 4);
 
 			DBG_vPrintf(TRACE_APP, "\n\rAPP: PREP_TO_SLEEP_STATE\n\r");
@@ -420,7 +420,6 @@ PRIVATE void APP_stateMachine(void)
 
 		default:
 		{
-			//TODO: Handle error
 			DBG_vPrintf
 			(
 				TRACE_APP,
@@ -455,12 +454,14 @@ PRIVATE void APP_handleData(uint16 * data_ptr)
 			s_device.channelBValue = data_ptr[3];
 			s_device.gainValue = data_ptr[4];
 
-			if(s_device.samplePeriod == POLLING_PERIOD)	s_device.samplePeriod += 1;
-
 			DBG_vPrintf(TRACE_APP, "  samplePeriod = %d\n\r",s_device.samplePeriod);
 			DBG_vPrintf(TRACE_APP, "  channelAValue = %d\n\r",s_device.channelAValue);
 			DBG_vPrintf(TRACE_APP, "  channelBValue = %d\n\r",s_device.channelBValue);
 			DBG_vPrintf(TRACE_APP, "  gainValue = %d\n\r",s_device.gainValue);
+
+			if(s_device.samplePeriod == POLLING_PERIOD)	s_device.samplePeriod += 1;
+
+			//TODO: Save config parameters in flash
 
 			APP_txBuffer[0] = '~';
 			APP_txBuffer[1] = s_device.samplePeriod;
@@ -475,6 +476,8 @@ PRIVATE void APP_handleData(uint16 * data_ptr)
 		{
 			DBG_vPrintf(TRACE_APP, "APP: GO command received\n\r");
 			s_device.isConfigured = TRUE;
+
+			//TODO: Save config flag in flash
 
 			APP_txBuffer[0] = '$';
 			APP_txBuffer[1] = 'G';

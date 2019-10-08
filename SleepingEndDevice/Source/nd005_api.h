@@ -78,6 +78,27 @@ PUBLIC void nd005_init(void);
  */
 PUBLIC void nd005_lowPower(uint8 enable);
 
+/** @brief
+ *
+ *  @param
+ *  @return
+ */
+PUBLIC uint16 nd005_getTemperature(void);
+
+/** @brief
+ *
+ *  @param
+ *  @return
+ */
+PUBLIC uint16 nd005_getBattery(void);
+
+/** @brief
+ *
+ *  @param
+ *  @return
+ */
+PUBLIC uint16 nd005_getSensorValue(void);
+
 /****************************************************************************/
 /***        External Variables                                            ***/
 /****************************************************************************/
