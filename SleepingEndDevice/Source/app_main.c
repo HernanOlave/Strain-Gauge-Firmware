@@ -42,6 +42,8 @@ PRIVATE PWRM_DECLARE_CALLBACK_DESCRIPTOR(PreSleep);
 /***        Exported Variables                                            ***/
 /****************************************************************************/
 
+PUBLIC seDeviceDesc_t s_device;
+
 /****************************************************************************/
 /***        Exported Functions                                            ***/
 /****************************************************************************/
@@ -120,6 +122,7 @@ PUBLIC void vAppMain(void)
     nwk_init();
 
     /* Setup High power module */
+    //TODO: test high power mode
     vAppApiSetHighPowerMode(APP_API_MODULE_HPM06, TRUE);
 
     /* On startup, first state is CONNECTING_NWK_STATE */
@@ -168,6 +171,7 @@ PRIVATE void APP_vSetUpHardware(void)
 
 PRIVATE PWRM_CALLBACK(PreSleep)
 {
+	DBG_vPrintf(TRACE_APP, "APP: Going to sleep...\n\r\n\r");
     vAppApiSaveMacSettings();
     ZTIMER_vSleep();
 }
@@ -189,8 +193,6 @@ PRIVATE PWRM_CALLBACK(Wakeup)
 
     APP_vSetUpHardware();
 
-	DBG_vPrintf(TRACE_APP, "\n\r\n\r*** WAKE UP ROUTINE ***\n\r");
-
     ZTIMER_vWake();
 
 	nd005_init();
@@ -199,6 +201,7 @@ PRIVATE PWRM_CALLBACK(Wakeup)
 
 PRIVATE void vPollCallBack(void)
 {
+	DBG_vPrintf(TRACE_APP, "\n\r**** POLL WAKE UP ROUTINE ****\n\r");
 	if(lockFlag)
 	{
 		/* Set wakeup time */
@@ -219,7 +222,7 @@ PRIVATE void vPollCallBack(void)
 		{
 			/* Poll data from Stack */
 			ZPS_eAplZdoPoll();
-			DBG_vPrintf(TRACE_APP, "APP: POLL_DATA_STATE\n\r");
+			DBG_vPrintf(TRACE_APP, "\n\rAPP: POLL_DATA_STATE\n\r");
 			app_currentState = POLL_DATA_STATE;
 		}
 	}
@@ -227,6 +230,7 @@ PRIVATE void vPollCallBack(void)
 
 PRIVATE void vDataCallBack(void)
 {
+	DBG_vPrintf(TRACE_APP, "\n\r**** SAMPLE WAKE UP ROUTINE ****\n\r");
 	if(lockFlag)
 	{
 		/* Set wakeup time */
@@ -245,8 +249,7 @@ PRIVATE void vDataCallBack(void)
 		}
 		else
 		{
-			DBG_vPrintf(TRACE_APP, "\n\r\n\r*** WAKE UP ROUTINE ***\n\r");
-			DBG_vPrintf(TRACE_APP, "APP: SEND_DATA_STATE\n\r");
+			DBG_vPrintf(TRACE_APP, "\n\rAPP: SEND_DATA_STATE\n\r");
 			app_currentState = SEND_DATA_STATE;
 		}
 	}
@@ -339,33 +342,71 @@ PRIVATE void APP_stateMachine(void)
 
 		case PREP_TO_SLEEP_STATE:
 		{
+			PWRM_teStatus eStatus;
+
 			nd005_lowPower(TRUE);
 			ZTIMER_eStop(u8TimerWatchdog);
 
 			lockFlag = FALSE;
 
-			DBG_vPrintf
-			(
-				TRACE_APP,
-				"APP: Sleep for %d seconds\n\r",
-				10
-			);
+			if(s_device.isConfigured)
+			{
+				/* Set polling activity */
+				eStatus = PWRM_eScheduleActivity
+				(
+					&sPoll,
+					SECS_TO_TICKS(POLLING_PERIOD),
+					vPollCallBack
+				);
 
-			/* Set wakeup time */
-			PWRM_eScheduleActivity
-			(
-				&sPoll,
-				SECS_TO_TICKS(10),
-				vPollCallBack
-			);
+				if(eStatus == PWRM_E_OK)
+				{
+					DBG_vPrintf
+					(
+						TRACE_APP,
+						"APP: Polling in %d seconds\n\r",
+						POLLING_PERIOD
+					);
+				}
 
-			/* Set wakeup time */
-			PWRM_eScheduleActivity
-			(
-				&sData,
-				SECS_TO_TICKS(30),
-				vDataCallBack
-			);
+				/* Set sampling activity */
+				eStatus = PWRM_eScheduleActivity
+				(
+					&sData,
+					SECS_TO_TICKS(s_device.samplePeriod),
+					vDataCallBack
+				);
+
+				if(eStatus == PWRM_E_OK)
+				{
+					DBG_vPrintf
+					(
+						TRACE_APP,
+						"APP: Sampling in %d seconds\n\r",
+						s_device.samplePeriod
+					);
+				}
+			}
+			else
+			{
+				/* Set fast polling activity */
+				eStatus = PWRM_eScheduleActivity
+				(
+					&sPoll,
+					SECS_TO_TICKS(FAST_POLLING_PERIOD),
+					vPollCallBack
+				);
+
+				if(eStatus == PWRM_E_OK)
+				{
+					DBG_vPrintf
+					(
+						TRACE_APP,
+						"APP: Fast polling in %d seconds\n\r",
+						FAST_POLLING_PERIOD
+					);
+				}
+			}
 
 			app_currentState = SLEEP_STATE;
 		}
@@ -408,13 +449,37 @@ PRIVATE void APP_handleData(uint16 * data_ptr)
 
 		case '~':
 		{
-			DBG_vPrintf(TRACE_APP, "APP: Configuration command received\n\r");
+			DBG_vPrintf(TRACE_APP, "APP: Configuration command received:\n\r");
+			s_device.samplePeriod = data_ptr[1];
+			s_device.channelAValue = data_ptr[2];
+			s_device.channelBValue = data_ptr[3];
+			s_device.gainValue = data_ptr[4];
+
+			if(s_device.samplePeriod == POLLING_PERIOD)	s_device.samplePeriod += 1;
+
+			DBG_vPrintf(TRACE_APP, "  samplePeriod = %d\n\r",s_device.samplePeriod);
+			DBG_vPrintf(TRACE_APP, "  channelAValue = %d\n\r",s_device.channelAValue);
+			DBG_vPrintf(TRACE_APP, "  channelBValue = %d\n\r",s_device.channelBValue);
+			DBG_vPrintf(TRACE_APP, "  gainValue = %d\n\r",s_device.gainValue);
+
+			APP_txBuffer[0] = '~';
+			APP_txBuffer[1] = s_device.samplePeriod;
+			APP_txBuffer[2] = s_device.channelAValue;
+			APP_txBuffer[3] = s_device.channelBValue;
+			APP_txBuffer[4] = s_device.gainValue;
+			nwk_sendData(APP_txBuffer, 5);
 		}
 		break;
 
 		case '$':
 		{
 			DBG_vPrintf(TRACE_APP, "APP: GO command received\n\r");
+			s_device.isConfigured = TRUE;
+
+			APP_txBuffer[0] = '$';
+			APP_txBuffer[1] = 'G';
+			APP_txBuffer[2] = 'O';
+			nwk_sendData(APP_txBuffer, 3);
 		}
 		break;
 

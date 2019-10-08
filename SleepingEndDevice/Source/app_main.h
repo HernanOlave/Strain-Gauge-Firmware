@@ -65,6 +65,9 @@
 #define APP_QUEUE_SIZE			2
 #define MCPS_DCFM_QUEUE_SIZE	8
 
+#define POLLING_PERIOD			30
+#define FAST_POLLING_PERIOD		5
+
 #define SECS_TO_TICKS(seconds)	seconds * 32768
 #define STATE_MACHINE_WDG_TIME	ZTIMER_TIME_MSEC(5000)
 
