@@ -17,7 +17,6 @@
 #define CHANNEL_A_DEFAULT_VALUE		2048	// DAC's channel A
 #define CHANNEL_B_DEFAULT_VALUE		2048	// DAC's channel B
 #define GAIN_DEFAULT_VALUE			32		// INAMP Gain
-#define DEFAULT_SLEEP_TIME			5		// seconds TODO: change this in production
 #define DEFAULT_SAMPLE_PERIOD		10		// seconds
 
 #define CONFIG_BUTTON_PIN			13

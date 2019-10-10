@@ -118,7 +118,38 @@ PUBLIC void vAppMain(void)
     if(!nd005_getConfigButton())
     {
     	DBG_vPrintf(TRACE_APP, "APP: Deleting all records from flash\n\r");
-    	pdm_deleteAllRecords();
+    	PDM_vDeleteAllDataRecords();
+    }
+
+    /* Restore any application data previously saved to flash
+     * All Application records must be loaded before the call to
+     * ZPS_eAplAfInit
+     */
+    uint16 u16DataBytesRead;
+    uint64 currentEpid;
+
+    DBG_vPrintf(TRACE_APP, "APP: Restoring application data from flash\n\r");
+
+    PDM_eReadDataFromRecord(PDM_APP_ID_EPID, &currentEpid, sizeof(currentEpid), &u16DataBytesRead);
+    if(currentEpid) nwk_setEpid(currentEpid);
+
+    PDM_eReadDataFromRecord(PDM_APP_ID_CONFIGURED, &s_device.isConfigured, sizeof(s_device.isConfigured), &u16DataBytesRead);
+
+    /* If configured flag is set, then restore analog parameters */
+    if(s_device.isConfigured)
+    {
+    	PDM_eReadDataFromRecord(PDM_APP_ID_SAMPLE_PERIOD, &s_device.samplePeriod, sizeof(s_device.samplePeriod), &u16DataBytesRead);
+    	PDM_eReadDataFromRecord(PDM_APP_ID_CHANNEL_A, &s_device.channelAValue, sizeof(s_device.channelAValue), &u16DataBytesRead);
+    	PDM_eReadDataFromRecord(PDM_APP_ID_CHANNEL_B, &s_device.channelBValue, sizeof(s_device.channelBValue), &u16DataBytesRead);
+    	PDM_eReadDataFromRecord(PDM_APP_ID_GAIN, &s_device.gainValue, sizeof(s_device.gainValue), &u16DataBytesRead);
+    }
+    else
+    {
+    	DBG_vPrintf(TRACE_APP, "APP: No config flag found, loading default values\n\r");
+    	s_device.samplePeriod = DEFAULT_SAMPLE_PERIOD;
+    	s_device.channelAValue = CHANNEL_A_DEFAULT_VALUE;
+    	s_device.channelBValue = CHANNEL_B_DEFAULT_VALUE;
+    	s_device.gainValue = GAIN_DEFAULT_VALUE;
     }
 
     /* Initialize application API */
@@ -130,6 +161,15 @@ PUBLIC void vAppMain(void)
     /* Setup High power module */
     //TODO: test high power mode
     vAppApiSetHighPowerMode(APP_API_MODULE_HPM06, TRUE);
+
+    DBG_vPrintf(TRACE_APP, "APP: Device Information:\n\r");
+    DBG_vPrintf(TRACE_APP, "  MAC: 0x%016llx\n\r", ZPS_u64AplZdoGetIeeeAddr());
+    DBG_vPrintf(TRACE_APP, "  EPID: 0x%016llx\n\r", nwk_getEpid());
+    DBG_vPrintf(TRACE_APP, "  Sample Period: %d\n\r", s_device.samplePeriod);
+    DBG_vPrintf(TRACE_APP, "  Configured Flag: %d\n\r", s_device.isConfigured);
+    DBG_vPrintf(TRACE_APP, "  Channel A: %d\n\r", s_device.channelAValue);
+    DBG_vPrintf(TRACE_APP, "  Channel B: %d\n\r", s_device.channelBValue);
+    DBG_vPrintf(TRACE_APP, "  Gain: %d\n\r", s_device.gainValue);
 
     /* On startup, first state is CONNECTING_NWK_STATE */
     DBG_vPrintf(TRACE_APP, "\n\rAPP: CONNECTING_NWK_STATE\n\r");
