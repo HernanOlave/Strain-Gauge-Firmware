@@ -115,6 +115,12 @@ PUBLIC void vAppMain(void)
     /* Register callback that provides information about stack errors */
     ZPS_vExtendedStatusSetCallback(vfExtendedStatusCallBack);
 
+    if(!nd005_getConfigButton())
+    {
+    	DBG_vPrintf(TRACE_APP, "APP: Deleting all records from flash\n\r");
+    	pdm_deleteAllRecords();
+    }
+
     /* Initialize application API */
     nd005_init();
 

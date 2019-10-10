@@ -39,8 +39,8 @@
 #include <jendefs.h>
 #include <pdm.h>
 #include <dbg_uart.h>
-#include <PDM_IDs.h>
-#include <app_common.h>
+
+#include "app_pdm.h"
 
 /****************************************************************************/
 /***        Macro Definitions                                             ***/
@@ -59,16 +59,13 @@
 /****************************************************************************/
 /***        Local Function Prototypes                                     ***/
 /****************************************************************************/
-#ifdef PDM_EEPROM
-    PUBLIC uint8 u8PDM_CalculateFileSystemCapacity(void);
-    PUBLIC uint8 u8PDM_GetFileSystemOccupancy(void);
-#endif
+
+PUBLIC uint8 u8PDM_CalculateFileSystemCapacity(void);
+PUBLIC uint8 u8PDM_GetFileSystemOccupancy(void);
 
 /****************************************************************************/
 /***        Exported Variables                                            ***/
 /****************************************************************************/
-
-extern PDM_tsRecordDescriptor sDevicePDDesc;
 
 /****************************************************************************/
 /***        Local Variables                                               ***/
@@ -78,18 +75,6 @@ extern PDM_tsRecordDescriptor sDevicePDDesc;
 /***        Exported Functions                                            ***/
 /****************************************************************************/
 
-#ifdef PDM_EEPROM
-/****************************************************************************
- *
- * NAME: vPdmEventHandlerCallback
- *
- * DESCRIPTION:
- * Handles PDM callback, information the application of PDM conditions
- *
- * RETURNS:
- * void
- *
- ****************************************************************************/
 PUBLIC void vPdmEventHandlerCallback(uint32 u32EventNumber, PDM_eSystemEventCode eSystemEventCode)
 {
     switch (eSystemEventCode)
@@ -147,29 +132,25 @@ PUBLIC void vPdmEventHandlerCallback(uint32 u32EventNumber, PDM_eSystemEventCode
         break;
     }
 }
-#endif
 
-/****************************************************************************
- *
- * NAME: vDisplayPDMUsage
- *
- * DESCRIPTION:
- * Displays the PDM capacity and current occupancy
- *
- * RETURNS:
- * void
- *
- ****************************************************************************/
 PUBLIC void vDisplayPDMUsage(void)
 {
-	#ifdef PDM_EEPROM
-		/*
-		 * The functions u8PDM_CalculateFileSystemCapacity and u8PDM_GetFileSystemOccupancy
-		 * may be called at any time to monitor space available in  the eeprom
-		 */
-		DBG_vPrintf(TRACE_PDM, "\r\nPDM: Capacity %d\n", u8PDM_CalculateFileSystemCapacity());
-		DBG_vPrintf(TRACE_PDM, "\r\nPDM: Occupancy %d\n", u8PDM_GetFileSystemOccupancy());
-	#endif
+	/*
+	 * The functions u8PDM_CalculateFileSystemCapacity and u8PDM_GetFileSystemOccupancy
+	 * may be called at any time to monitor space available in  the eeprom
+	 */
+	DBG_vPrintf(TRACE_PDM, "\r\nPDM: Capacity %d\n", u8PDM_CalculateFileSystemCapacity());
+	DBG_vPrintf(TRACE_PDM, "\r\nPDM: Occupancy %d\n", u8PDM_GetFileSystemOccupancy());
+}
+
+PUBLIC void pdm_deleteAllRecords(void)
+{
+    PDM_vDeleteDataRecord(PDM_APP_ID_SAMPLE_PERIOD);
+    PDM_vDeleteDataRecord(PDM_APP_ID_CONFIGURED);
+    PDM_vDeleteDataRecord(PDM_APP_ID_EPID);
+    PDM_vDeleteDataRecord(PDM_APP_ID_CHANNEL_A);
+    PDM_vDeleteDataRecord(PDM_APP_ID_CHANNEL_B);
+    PDM_vDeleteDataRecord(PDM_APP_ID_GAIN);
 }
 
 /****************************************************************************/

@@ -136,6 +136,12 @@ PUBLIC uint16 nd005_getSensorValue(void)
 	return getMedianAvg(2, 10);
 }
 
+PUBLIC bool nd005_getConfigButton(void)
+{
+	if (!((1 << CONFIG_BUTTON_PIN) & u32AHI_DioReadInput())) return FALSE;
+	else return TRUE;
+}
+
 /****************************************************************************/
 /***        Local Functions                                               ***/
 /****************************************************************************/

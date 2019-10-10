@@ -51,15 +51,6 @@ typedef struct
 	uint16						sleepTime;
 } seDeviceDesc_t;
 
-enum {
-    PDM_APP_ID_SAMPLE_PERIOD = 0x100,   // configured sample period value
-    PDM_APP_ID_CONFIGURED,              // flag indicating configuration is finished and device is active
-    PDM_APP_ID_EPID,                    // EPID of current/last authorized network
-    PDM_APP_ID_BLACKLIST,               // list of incompatible network EPIDs
-    PDM_APP_ID_CHANNEL_A,				// configured value for DAC's channel A
-    PDM_APP_ID_CHANNEL_B,				// configured value for DAC's channel B
-    PDM_APP_ID_GAIN,					// configured value for INAMP's Gain
-};
 /****************************************************************************/
 /***        Exported Functions                                            ***/
 /****************************************************************************/
@@ -98,6 +89,14 @@ PUBLIC uint16 nd005_getBattery(void);
  *  @return
  */
 PUBLIC uint16 nd005_getSensorValue(void);
+
+/** @brief
+ *
+ *  @param
+ *  @return
+ */
+PUBLIC bool nd005_getConfigButton(void);
+
 
 /****************************************************************************/
 /***        External Variables                                            ***/

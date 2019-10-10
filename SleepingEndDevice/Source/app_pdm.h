@@ -47,14 +47,23 @@
 /***        Type Definitions                                              ***/
 /****************************************************************************/
 
+enum
+{
+    PDM_APP_ID_SAMPLE_PERIOD = 0x100,   // configured sample period value
+    PDM_APP_ID_CONFIGURED,              // flag indicating configuration is finished and device is active
+    PDM_APP_ID_EPID,                    // EPID of current/last authorized network
+    PDM_APP_ID_CHANNEL_A,				// configured value for DAC's channel A
+    PDM_APP_ID_CHANNEL_B,				// configured value for DAC's channel B
+    PDM_APP_ID_GAIN,					// configured value for INAMP's Gain
+};
+
 /****************************************************************************/
 /***        Exported Functions                                            ***/
 /****************************************************************************/
 
-#ifdef PDM_EEPROM
 PUBLIC void vPdmEventHandlerCallback(uint32 u32EventNumber, PDM_eSystemEventCode eSystemEventCode);
 PUBLIC void vDisplayPDMUsage(void);
-#endif
+PUBLIC void pdm_deleteAllRecords(void);
 
 /****************************************************************************/
 /***        External Variables                                            ***/

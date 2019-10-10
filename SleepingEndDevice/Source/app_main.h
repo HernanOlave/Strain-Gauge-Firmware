@@ -21,7 +21,6 @@
 #include "pdum_nwk.h"
 #include "pdum_apl.h"
 #include "pdum_gen.h"
-#include "PDM.h"
 #include "dbg.h"
 #include "dbg_uart.h"
 #include "rnd_pub.h"
@@ -41,6 +40,7 @@
 #include "ZTimer.h"
 #include "ZQueue.h"
 
+#include "app_pdm.h"
 #include "nwk_api.h"
 
 /****************************************************************************/
