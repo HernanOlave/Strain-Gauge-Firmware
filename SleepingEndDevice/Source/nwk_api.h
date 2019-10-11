@@ -36,7 +36,8 @@ typedef enum
     NWK_DISC_NO_EVENT,
     NWK_DISC_FAIL,
     NWK_DISC_JOIN_NOT_PERMITTED,
-    NWK_DISC_UNK_ERROR
+    NWK_DISC_UNK_ERROR,
+    NWK_DISC_FAILED_TO_JOIN
 } discReturnValues_t;
 
 /****************************************************************************/

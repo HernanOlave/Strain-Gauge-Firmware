@@ -145,12 +145,16 @@ PUBLIC void vDisplayPDMUsage(void)
 
 PUBLIC void pdm_deleteAllRecords(void)
 {
-    PDM_vDeleteDataRecord(PDM_APP_ID_SAMPLE_PERIOD);
-    PDM_vDeleteDataRecord(PDM_APP_ID_CONFIGURED);
-    PDM_vDeleteDataRecord(PDM_APP_ID_EPID);
-    PDM_vDeleteDataRecord(PDM_APP_ID_CHANNEL_A);
-    PDM_vDeleteDataRecord(PDM_APP_ID_CHANNEL_B);
-    PDM_vDeleteDataRecord(PDM_APP_ID_GAIN);
+	uint64 epid = 0;
+	uint16 temp = 0;
+	bool flag = FALSE;
+
+	PDM_eSaveRecordData(PDM_APP_ID_EPID, &epid, sizeof(epid));
+	PDM_eSaveRecordData(PDM_APP_ID_SAMPLE_PERIOD, &temp, sizeof(temp));
+	PDM_eSaveRecordData(PDM_APP_ID_CONFIGURED, &flag, sizeof(flag));
+	PDM_eSaveRecordData(PDM_APP_ID_CHANNEL_A, &temp, sizeof(temp));
+	PDM_eSaveRecordData(PDM_APP_ID_CHANNEL_B, &temp, sizeof(temp));
+	PDM_eSaveRecordData(PDM_APP_ID_GAIN, &temp, sizeof(temp));
 }
 
 /****************************************************************************/

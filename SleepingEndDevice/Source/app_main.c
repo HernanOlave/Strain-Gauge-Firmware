@@ -118,7 +118,7 @@ PUBLIC void vAppMain(void)
     if(!nd005_getConfigButton())
     {
     	DBG_vPrintf(TRACE_APP, "APP: Deleting all records from flash\n\r");
-    	PDM_vDeleteAllDataRecords();
+    	pdm_deleteAllRecords();
     }
 
     /* Restore any application data previously saved to flash
@@ -132,6 +132,7 @@ PUBLIC void vAppMain(void)
 
     PDM_eReadDataFromRecord(PDM_APP_ID_EPID, &currentEpid, sizeof(currentEpid), &u16DataBytesRead);
     if(currentEpid) nwk_setEpid(currentEpid);
+    else nwk_setEpid(0);
 
     PDM_eReadDataFromRecord(PDM_APP_ID_CONFIGURED, &s_device.isConfigured, sizeof(s_device.isConfigured), &u16DataBytesRead);
 
@@ -339,6 +340,9 @@ PRIVATE void APP_stateMachine(void)
 			}
 			if(nwk_isConnected())
 			{
+				uint64 epid = nwk_getEpid();
+
+				PDM_eSaveRecordData(PDM_APP_ID_EPID, &epid, sizeof(epid));
 				DBG_vPrintf(TRACE_APP, "\n\rAPP: POLL_DATA_STATE\n\r");
 				app_currentState = POLL_DATA_STATE;
 			}

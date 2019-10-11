@@ -364,6 +364,7 @@ PUBLIC void nwk_taskHandler(void)
 		case ZPS_EVENT_NWK_FAILED_TO_JOIN:
 		{
 			DBG_vPrintf(TRACE_APP, "  NWK: ZPS_EVENT_NWK_FAILED_TO_JOIN\n\r");
+			s_network.discStatus = NWK_DISC_FAILED_TO_JOIN
 		}
 		break;
 
@@ -372,6 +373,7 @@ PUBLIC void nwk_taskHandler(void)
 			DBG_vPrintf(TRACE_APP, "  NWK: ZPS_EVENT_NWK_JOINED_AS_ENDDEVICE\n\r");
 			DBG_vPrintf(TRACE_APP, "  NWK: Node joined network with Address 0x%04x\n",
 				sStackEvent.uEvent.sNwkJoinedEvent.u16Addr);
+			nwk_setEpid(ZPS_u64AplZdoGetNetworkExtendedPanId());
 			s_network.isConnected = TRUE;
 		}
 		break;
