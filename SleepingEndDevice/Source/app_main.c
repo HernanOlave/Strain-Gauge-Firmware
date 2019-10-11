@@ -31,6 +31,8 @@
 /***        Local Function Prototypes                                     ***/
 /****************************************************************************/
 
+void sendBroadcast(void);
+
 /****************************************************************************/
 /***        Local Variables                                               ***/
 /****************************************************************************/
@@ -341,10 +343,12 @@ PRIVATE void APP_stateMachine(void)
 			if(nwk_isConnected())
 			{
 				uint64 epid = nwk_getEpid();
-
 				PDM_eSaveRecordData(PDM_APP_ID_EPID, &epid, sizeof(epid));
-				DBG_vPrintf(TRACE_APP, "\n\rAPP: POLL_DATA_STATE\n\r");
-				app_currentState = POLL_DATA_STATE;
+
+				sendBroadcast();
+
+				DBG_vPrintf(TRACE_APP, "\n\rAPP: PREP_TO_SLEEP_STATE\n\r");
+				app_currentState = PREP_TO_SLEEP_STATE;
 			}
 		}
 		break;
@@ -489,11 +493,7 @@ PRIVATE void APP_handleData(uint16 * data_ptr)
 	{
 		case '&':
 		{
-			DBG_vPrintf(TRACE_APP, "APP: Broadcast command received\n\r");
-			APP_txBuffer[0] = '&';
-			APP_txBuffer[1] = DEVICE_TYPE | (VERSION_MAJOR << 8);
-			APP_txBuffer[2] = VERSION_MINOR;
-			nwk_sendData(APP_txBuffer, 3);
+			sendBroadcast();
 		}
 		break;
 
@@ -548,6 +548,15 @@ PRIVATE void APP_handleData(uint16 * data_ptr)
 		}
 		break;
 	}
+}
+
+void sendBroadcast(void)
+{
+	DBG_vPrintf(TRACE_APP, "APP: Broadcast command received\n\r");
+	APP_txBuffer[0] = '&';
+	APP_txBuffer[1] = DEVICE_TYPE | (VERSION_MAJOR << 8);
+	APP_txBuffer[2] = VERSION_MINOR;
+	nwk_sendData(APP_txBuffer, 3);
 }
 
 /****************************************************************************/
