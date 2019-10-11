@@ -397,8 +397,6 @@ PRIVATE void APP_stateMachine(void)
 			nd005_lowPower(TRUE);
 			ZTIMER_eStop(u8TimerWatchdog);
 
-			lockFlag = FALSE;
-
 			if(s_device.isConfigured)
 			{
 				/* Set polling activity */
@@ -419,22 +417,25 @@ PRIVATE void APP_stateMachine(void)
 					);
 				}
 
-				/* Set sampling activity */
-				eStatus = PWRM_eScheduleActivity
-				(
-					&sData,
-					SECS_TO_TICKS(s_device.samplePeriod),
-					vDataCallBack
-				);
-
-				if(eStatus == PWRM_E_OK)
+				if(nwk_isConnected())
 				{
-					DBG_vPrintf
+					/* Set sampling activity */
+					eStatus = PWRM_eScheduleActivity
 					(
-						TRACE_APP,
-						"APP: Sampling in %d seconds\n\r",
-						s_device.samplePeriod
+						&sData,
+						SECS_TO_TICKS(s_device.samplePeriod),
+						vDataCallBack
 					);
+
+					if(eStatus == PWRM_E_OK)
+					{
+						DBG_vPrintf
+						(
+							TRACE_APP,
+							"APP: Sampling in %d seconds\n\r",
+							s_device.samplePeriod
+						);
+					}
 				}
 			}
 			else
@@ -458,6 +459,7 @@ PRIVATE void APP_stateMachine(void)
 				}
 			}
 
+			lockFlag = FALSE;
 			app_currentState = SLEEP_STATE;
 		}
 		break;
@@ -489,10 +491,9 @@ PRIVATE void APP_handleData(uint16 * data_ptr)
 		{
 			DBG_vPrintf(TRACE_APP, "APP: Broadcast command received\n\r");
 			APP_txBuffer[0] = '&';
-			APP_txBuffer[1] = DEVICE_TYPE;
-			APP_txBuffer[2] = VERSION_MAJOR;
-			APP_txBuffer[3] = VERSION_MINOR;
-			nwk_sendData(APP_txBuffer, 4);
+			APP_txBuffer[1] = DEVICE_TYPE | (VERSION_MAJOR << 8);
+			APP_txBuffer[2] = VERSION_MINOR;
+			nwk_sendData(APP_txBuffer, 3);
 		}
 		break;
 
@@ -511,7 +512,11 @@ PRIVATE void APP_handleData(uint16 * data_ptr)
 
 			if(s_device.samplePeriod == POLLING_PERIOD)	s_device.samplePeriod += 1;
 
-			//TODO: Save config parameters in flash
+			/* Store parameters in flash */
+			PDM_eSaveRecordData(PDM_APP_ID_SAMPLE_PERIOD, &s_device.samplePeriod, sizeof(s_device.samplePeriod));
+			PDM_eSaveRecordData(PDM_APP_ID_CHANNEL_A, &s_device.channelAValue, sizeof(s_device.channelAValue));
+			PDM_eSaveRecordData(PDM_APP_ID_CHANNEL_B, &s_device.channelBValue, sizeof(s_device.channelBValue));
+			PDM_eSaveRecordData(PDM_APP_ID_GAIN, &s_device.gainValue, sizeof(s_device.gainValue));
 
 			APP_txBuffer[0] = '~';
 			APP_txBuffer[1] = s_device.samplePeriod;
@@ -527,7 +532,8 @@ PRIVATE void APP_handleData(uint16 * data_ptr)
 			DBG_vPrintf(TRACE_APP, "APP: GO command received\n\r");
 			s_device.isConfigured = TRUE;
 
-			//TODO: Save config flag in flash
+			/* Save configured flag in flash */
+			PDM_eSaveRecordData(PDM_APP_ID_CONFIGURED, &s_device.isConfigured, sizeof(s_device.isConfigured));
 
 			APP_txBuffer[0] = '$';
 			APP_txBuffer[1] = 'G';

@@ -46,6 +46,7 @@
 #endif
 
 #define MAX_NO_NWK_STRIKES	3		// times (fixed by ZPS_Config Editor)
+#define MAX_NO_ACK_STRIKES	5		// times (fixed by ZPS_Config Editor)
 #define RX_BUFFER_SIZE		50		//
 
 /****************************************************************************/
@@ -57,6 +58,7 @@ typedef struct
 	uint64				currentEpid;
 	bool				isConnected;
 	uint8				noNwkStrikes;
+	uint8				noAckStrikes;
 	discReturnValues_t	discStatus;
 	pollReturnValues_t	pollStatus;
 } networkDesc_t;
@@ -279,7 +281,9 @@ PUBLIC void nwk_init(void)
 
 	s_network.isConnected = FALSE;
 	s_network.noNwkStrikes = 0;
+	s_network.noAckStrikes = 0;
 	s_network.pollStatus = NWK_POLL_NO_EVENT;
+	s_network.discStatus = NWK_DISC_NO_EVENT;
 
 	/* Initialize ZBPro stack */
 	ZPS_eAplAfInit();
@@ -328,8 +332,31 @@ PUBLIC void nwk_taskHandler(void)
 
 		case ZPS_EVENT_APS_DATA_CONFIRM:
 		{
-			DBG_vPrintf(TRACE_APP, "  NWK: ZPS_EVENT_APS_DATA_CONFIRM, status = 0x%02x\n\r",
-					sStackEvent.uEvent.sApsDataConfirmEvent.u8Status);
+			uint8 status = sStackEvent.uEvent.sApsDataConfirmEvent.u8Status;
+			DBG_vPrintf(TRACE_APP, "  NWK: ZPS_EVENT_APS_DATA_CONFIRM, status = 0x%02x\n\r", status);
+
+			if(status == MAC_ENUM_NO_ACK)
+			{
+				/* add 1 strike */
+				s_network.noAckStrikes++;
+				DBG_vPrintf
+				(
+					TRACE_APP,
+					"  NWK: No Acknowledge received, strike = %d\n\r",
+					s_network.noAckStrikes
+				);
+
+				if(s_network.noAckStrikes >= MAX_NO_ACK_STRIKES)
+				{
+					s_network.noAckStrikes = 0;
+					s_network.isConnected = FALSE;
+					DBG_vPrintf(TRACE_APP,"  NWK: Connection lost\n\r");
+				}
+			}
+			else
+			{
+				s_network.noAckStrikes = 0;
+			}
 		}
 		break;
 
@@ -364,7 +391,7 @@ PUBLIC void nwk_taskHandler(void)
 		case ZPS_EVENT_NWK_FAILED_TO_JOIN:
 		{
 			DBG_vPrintf(TRACE_APP, "  NWK: ZPS_EVENT_NWK_FAILED_TO_JOIN\n\r");
-			s_network.discStatus = NWK_DISC_FAILED_TO_JOIN
+			s_network.discStatus = NWK_DISC_FAILED_TO_JOIN;
 		}
 		break;
 
